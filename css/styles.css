@@ -42,9 +42,23 @@ body {
 
 /* 헤더 */
 header {
-    text-align: center;
     margin-bottom: 2rem;
     color: white;
+}
+
+.header-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 2rem;
+}
+
+.header-left {
+    text-align: left;
+}
+
+.header-right {
+    flex-shrink: 0;
 }
 
 header h1 {
@@ -57,6 +71,59 @@ header h1 {
 header .subtitle {
     font-size: 1.125rem;
     opacity: 0.95;
+}
+
+/* 인증 컨테이너 */
+.auth-container {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.google-icon {
+    width: 18px;
+    height: 18px;
+    margin-right: 0.5rem;
+}
+
+.user-info {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    background: rgba(255, 255, 255, 0.15);
+    padding: 0.5rem 1rem;
+    border-radius: var(--radius-lg);
+    backdrop-filter: blur(10px);
+}
+
+.user-photo {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    border: 2px solid white;
+}
+
+.user-details {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.user-name {
+    font-weight: 600;
+    font-size: 0.875rem;
+}
+
+.admin-badge {
+    background: linear-gradient(135deg, #f59e0b 0%, #f97316 100%);
+    color: white;
+    font-size: 0.75rem;
+    font-weight: 700;
+    padding: 0.125rem 0.5rem;
+    border-radius: 0.25rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
 /* 룸 선택 화면 */

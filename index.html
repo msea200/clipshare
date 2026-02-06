@@ -10,8 +10,28 @@
 <body>
     <div class="container">
         <header>
-            <h1>📋 클립보드 공유</h1>
-            <p class="subtitle">여러 PC 간 텍스트를 실시간으로 공유하세요</p>
+            <div class="header-content">
+                <div class="header-left">
+                    <h1>📋 클립보드 공유</h1>
+                    <p class="subtitle">여러 PC 간 텍스트를 실시간으로 공유하세요</p>
+                </div>
+                <div class="header-right">
+                    <div id="authContainer" class="auth-container">
+                        <button id="loginBtn" class="btn btn-secondary">
+                            <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" class="google-icon">
+                            Google 로그인
+                        </button>
+                        <div id="userInfo" class="user-info" style="display: none;">
+                            <img id="userPhoto" class="user-photo" alt="User">
+                            <div class="user-details">
+                                <span id="userName" class="user-name"></span>
+                                <span id="adminBadge" class="admin-badge" style="display: none;">관리자</span>
+                            </div>
+                            <button id="logoutBtn" class="btn-icon-sm">🚪</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </header>
 
         <!-- 룸 선택 화면 -->

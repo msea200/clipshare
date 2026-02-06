@@ -4,6 +4,11 @@ import { firebaseConfig, APP_NAME, APP_VERSION, RTDB_PATH, ROOM_EXPIRY_HOURS, MA
 // Firebase 초기화
 firebase.initializeApp(firebaseConfig);
 const database = firebase.database();
+const auth = firebase.auth();
+const googleProvider = new firebase.auth.GoogleAuthProvider();
+
+// 관리자 이메일 목록
+const ADMIN_EMAILS = ['msea200@gmail.com', 'bkcode200@gmail.com'];
 
 // DOM 요소
 const roomSelection = document.getElementById('roomSelection');
@@ -22,6 +27,12 @@ const copyRoomCodeBtn = document.getElementById('copyRoomCodeBtn');
 const connectionStatus = document.getElementById('connectionStatus');
 const connectionText = document.getElementById('connectionText');
 const notification = document.getElementById('notification');
+const loginBtn = document.getElementById('loginBtn');
+const logoutBtn = document.getElementById('logoutBtn');
+const userInfo = document.getElementById('userInfo');
+const userPhoto = document.getElementById('userPhoto');
+const userName = document.getElementById('userName');
+const adminBadge = document.getElementById('adminBadge');
 
 // 상태 관리
 let currentRoom = null;
@@ -31,6 +42,7 @@ let tempTextRef = null;
 let isUpdatingFromFirebase = false;
 let isUpdatingTempText = false;
 let tempTextTimeout = null;
+let currentUser = null;
 
 // 룸 코드 생성 (ABC-123 형식)
 function generateRoomCode() {
@@ -431,8 +443,62 @@ function formatRoomCode(input) {
     input.value = value;
 }
 
+// Google 로그인
+async function loginWithGoogle() {
+    try {
+        await auth.signInWithPopup(googleProvider);
+        showNotification('로그인 되었습니다!', 'success');
+    } catch (error) {
+        console.error('로그인 실패:', error);
+        showNotification('로그인에 실패했습니다.', 'error');
+    }
+}
+
+// 로그아웃
+async function logout() {
+    try {
+        await auth.signOut();
+        showNotification('로그아웃 되었습니다.', 'info');
+    } catch (error) {
+        console.error('로그아웃 실패:', error);
+        showNotification('로그아웃에 실패했습니다.', 'error');
+    }
+}
+
+// 사용자 UI 업데이트
+function updateUserUI(user) {
+    if (user) {
+        currentUser = user;
+        loginBtn.style.display = 'none';
+        userInfo.style.display = 'flex';
+        userPhoto.src = user.photoURL || 'https://via.placeholder.com/40';
+        userName.textContent = user.displayName || user.email;
+        
+        // 관리자 배지 표시
+        if (ADMIN_EMAILS.includes(user.email)) {
+            adminBadge.style.display = 'inline-block';
+        } else {
+            adminBadge.style.display = 'none';
+        }
+    } else {
+        currentUser = null;
+        loginBtn.style.display = 'flex';
+        userInfo.style.display = 'none';
+        adminBadge.style.display = 'none';
+    }
+}
+
+// 인증 상태 변경 리스너
+auth.onAuthStateChanged((user) => {
+    updateUserUI(user);
+});
+
 // 이벤트 리스너 설정
 function setupEventListeners() {
+    // 로그인/로그아웃
+    loginBtn.addEventListener('click', loginWithGoogle);
+    logoutBtn.addEventListener('click', logout);
+    
     // 룸 생성/입장
     createRoomBtn.addEventListener('click', createRoom);
     joinRoomBtn.addEventListener('click', () => {
