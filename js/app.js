@@ -33,6 +33,17 @@ const userInfo = document.getElementById('userInfo');
 const userPhoto = document.getElementById('userPhoto');
 const userName = document.getElementById('userName');
 const adminBadge = document.getElementById('adminBadge');
+const adminPanelBtn = document.getElementById('adminPanelBtn');
+const adminPanel = document.getElementById('adminPanel');
+const closeAdminBtn = document.getElementById('closeAdminBtn');
+const adminRoomList = document.getElementById('adminRoomList');
+const normalRooms = document.getElementById('normalRooms');
+const permanentRooms = document.getElementById('permanentRooms');
+const normalRoomsCard = document.getElementById('normalRoomsCard');
+const permanentRoomsCard = document.getElementById('permanentRoomsCard');
+const permanentBadge = document.getElementById('permanentBadge');
+const togglePermanentRoomBtn = document.getElementById('togglePermanentRoomBtn');
+const deleteRoomBtn = document.getElementById('deleteRoomBtn');
 
 // 상태 관리
 let currentRoom = null;
@@ -43,6 +54,8 @@ let isUpdatingFromFirebase = false;
 let isUpdatingTempText = false;
 let tempTextTimeout = null;
 let currentUser = null;
+let isFromAdminPanel = false; // 관리자 패널에서 입장했는지 여부
+let adminRoomFilter = 'normal'; // 'normal' or 'permanent'
 
 // 룸 코드 생성 (ABC-123 형식)
 function generateRoomCode() {
@@ -178,8 +191,8 @@ async function joinRoom(roomCode) {
         
         const roomData = snapshot.val();
         
-        // 만료된 룸 확인
-        if (roomData.expiresAt && roomData.expiresAt < Date.now()) {
+        // 만료된 룸 확인 (영구 보관이 아닌 경우)
+        if (!roomData.permanent && roomData.expiresAt && roomData.expiresAt < Date.now()) {
             await database.ref(`${RTDB_PATH.CLIPBOARD}/${formattedCode}`).remove();
             showNotification('만료된 룸입니다.', 'error');
             return;
@@ -190,6 +203,33 @@ async function joinRoom(roomCode) {
         roomRef = database.ref(`${RTDB_PATH.CLIPBOARD}/${formattedCode}`);
         clipboardsRef = roomRef.child('clipboards');
         tempTextRef = roomRef.child('tempText');
+        
+        // 영구 보관 배지 표시
+        if (roomData.permanent) {
+            permanentBadge.style.display = 'inline-block';
+        } else {
+            permanentBadge.style.display = 'none';
+        }
+        
+        // 관리자 모드일 때 삭제 및 영구 보관 버튼 표시
+        if (isAdmin()) {
+            togglePermanentRoomBtn.style.display = 'inline-block';
+            deleteRoomBtn.style.display = 'inline-block';
+            
+            // 영구 보관 버튼 아이콘 업데이트
+            if (roomData.permanent) {
+                togglePermanentRoomBtn.textContent = '🔓';
+                togglePermanentRoomBtn.title = '영구 보관 해제';
+                togglePermanentRoomBtn.classList.add('permanent');
+            } else {
+                togglePermanentRoomBtn.textContent = '🔒';
+                togglePermanentRoomBtn.title = '영구 보관 설정';
+                togglePermanentRoomBtn.classList.remove('permanent');
+            }
+        } else {
+            togglePermanentRoomBtn.style.display = 'none';
+            deleteRoomBtn.style.display = 'none';
+        }
         
         // UI 전환
         roomSelection.style.display = 'none';
@@ -411,10 +451,21 @@ function leaveRoom() {
     roomCodeInput.value = '';
     clipboardItems.innerHTML = '';
     
-    roomSelection.style.display = 'block';
     clipboardArea.style.display = 'none';
     
-    showNotification('룸에서 나갔습니다.', 'info');
+    // 관리자 패널에서 입장한 경우 관리자 패널로 돌아감
+    if (isFromAdminPanel && isAdmin()) {
+        adminPanel.style.display = 'block';
+        roomSelection.style.display = 'none';
+        loadAllRooms();
+        isFromAdminPanel = false;
+        showNotification('관리자 패널로 돌아왔습니다.', 'info');
+    } else {
+        roomSelection.style.display = 'block';
+        adminPanel.style.display = 'none';
+        isFromAdminPanel = false;
+        showNotification('룸에서 나갔습니다.', 'info');
+    }
 }
 
 // 룸 코드 복사
@@ -474,18 +525,257 @@ function updateUserUI(user) {
         userPhoto.src = user.photoURL || 'https://via.placeholder.com/40';
         userName.textContent = user.displayName || user.email;
         
+        console.log('User email:', user.email);
+        console.log('Is admin:', ADMIN_EMAILS.includes(user.email));
+        
         // 관리자 배지 표시
         if (ADMIN_EMAILS.includes(user.email)) {
             adminBadge.style.display = 'inline-block';
+            adminPanelBtn.style.display = 'block';
+            console.log('Admin panel button should be visible');
         } else {
             adminBadge.style.display = 'none';
+            adminPanelBtn.style.display = 'none';
         }
     } else {
         currentUser = null;
         loginBtn.style.display = 'flex';
         userInfo.style.display = 'none';
         adminBadge.style.display = 'none';
+        adminPanelBtn.style.display = 'none';
     }
+}
+
+// 관리자 여부 확인
+function isAdmin() {
+    return currentUser && ADMIN_EMAILS.includes(currentUser.email);
+}
+
+// 관리자 패널 열기
+function openAdminPanel() {
+    if (!isAdmin()) {
+        showNotification('관리자 권한이 필요합니다.', 'error');
+        return;
+    }
+    
+    adminPanel.style.display = 'block';
+    roomSelection.style.display = 'none';
+    clipboardArea.style.display = 'none';
+    loadAllRooms();
+}
+
+// 관리자 패널 닫기
+function closeAdminPanel() {
+    adminPanel.style.display = 'none';
+    roomSelection.style.display = 'block';
+}
+
+// 모든 룸 목록 로드
+async function loadAllRooms() {
+    try {
+        const snapshot = await database.ref(RTDB_PATH.CLIPBOARD).once('value');
+        const rooms = snapshot.val();
+        
+        if (!rooms) {
+            adminRoomList.innerHTML = '<div class="empty-state"><p>생성된 룸이 없습니다.</p></div>';
+            normalRooms.textContent = '0';
+            permanentRooms.textContent = '0';
+            return;
+        }
+        
+        const roomEntries = Object.entries(rooms);
+        const now = Date.now();
+        let permCount = 0;
+        let normalCount = 0;
+        
+        // 만료된 룸 필터링
+        const activeRooms = roomEntries.filter(([code, data]) => {
+            if (data.permanent) {
+                permCount++;
+                return true;
+            }
+            if (!data.expiresAt || data.expiresAt > now) {
+                normalCount++;
+                return true;
+            }
+            return false;
+        });
+        
+        // 필터에 따라 룸 분류
+        const filteredRooms = activeRooms.filter(([code, data]) => {
+            if (adminRoomFilter === 'permanent') {
+                return data.permanent === true;
+            } else {
+                return !data.permanent;
+            }
+        });
+        
+        // 최근 생성 순으로 정렬
+        filteredRooms.sort((a, b) => (b[1].createdAt || 0) - (a[1].createdAt || 0));
+        
+        normalRooms.textContent = normalCount;
+        permanentRooms.textContent = permCount;
+        
+        if (filteredRooms.length === 0) {
+            const message = adminRoomFilter === 'permanent' ? '영구 룸이 없습니다.' : '일반 룸이 없습니다.';
+            adminRoomList.innerHTML = `<div class="empty-state"><p>${message}</p></div>`;
+        } else {
+            adminRoomList.innerHTML = filteredRooms.map(([code, data]) => createAdminRoomItemHTML(code, data)).join('');
+            // 이벤트 리스너 추가
+            attachAdminRoomListeners();
+        }
+    } catch (error) {
+        console.error('룸 목록 로드 실패:', error);
+        showNotification('룸 목록 로드에 실패했습니다.', 'error');
+    }
+}
+
+// 관리자 룸 아이템 HTML 생성
+function createAdminRoomItemHTML(code, data) {
+    const createdTime = data.createdAt ? formatTime(data.createdAt) : '알 수 없음';
+    const clipboardCount = data.clipboards ? Object.keys(data.clipboards).length : 0;
+    const expiresTime = data.permanent ? '영구 보관' : 
+        (data.expiresAt ? new Date(data.expiresAt).toLocaleString('ko-KR') : '알 수 없음');
+    
+    return `
+        <div class="admin-room-item" data-room-code="${code}">
+            <div class="admin-room-header">
+                <div>
+                    <span class="admin-room-code">${code}</span>
+                    ${data.permanent ? '<span class="permanent-badge">🔒 영구 보관</span>' : ''}
+                </div>
+                <div class="admin-room-actions">
+                    <button class="btn-toggle-permanent ${data.permanent ? 'permanent' : ''}" 
+                            data-room-code="${code}" 
+                            data-permanent="${data.permanent || false}"
+                            title="${data.permanent ? '영구 보관 해제' : '영구 보관 설정'}">
+                        ${data.permanent ? '🔓' : '🔒'}
+                    </button>
+                    <button class="btn-icon-sm danger admin-delete-room" data-room-code="${code}" title="삭제">🗑️</button>
+                </div>
+            </div>
+            <div class="admin-room-info">
+                <div class="admin-room-info-item">📅 생성: ${createdTime}</div>
+                <div class="admin-room-info-item">📋 클립보드: ${clipboardCount}개</div>
+                <div class="admin-room-info-item">⏰ 만료: ${expiresTime}</div>
+            </div>
+        </div>
+    `;
+}
+
+// 관리자 룸 리스너 추가
+function attachAdminRoomListeners() {
+    // 룸 목록 클릭 시 입장
+    document.querySelectorAll('.admin-room-item').forEach(item => {
+        item.addEventListener('click', (e) => {
+            // 버튼 클릭은 제외
+            if (e.target.closest('button')) return;
+            
+            const roomCode = item.dataset.roomCode;
+            isFromAdminPanel = true; // 관리자 패널에서 입장했음을 표시
+            closeAdminPanel();
+            joinRoom(roomCode);
+        });
+    });
+    
+    // 영구 보관 토글
+    document.querySelectorAll('.btn-toggle-permanent').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+            e.stopPropagation(); // 상위 요소로 이벤트 전파 방지
+            const roomCode = e.target.dataset.roomCode;
+            const isPermanent = e.target.dataset.permanent === 'true';
+            await togglePermanent(roomCode, !isPermanent);
+        });
+    });
+    
+    // 룸 삭제
+    document.querySelectorAll('.admin-delete-room').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+            e.stopPropagation(); // 상위 요소로 이벤트 전파 방지
+            const roomCode = e.target.dataset.roomCode;
+            if (confirm(`룸 ${roomCode}을(를) 정말 삭제하시겠습니까?`)) {
+                await deleteRoom(roomCode);
+            }
+        });
+    });
+}
+
+// 룸 삭제 (관리자 전용)
+async function deleteRoom(roomCode) {
+    if (!isAdmin()) {
+        showNotification('관리자 권한이 필요합니다.', 'error');
+        return;
+    }
+    
+    try {
+        await database.ref(`${RTDB_PATH.CLIPBOARD}/${roomCode}`).remove();
+        showNotification(`룸 ${roomCode}이(가) 삭제되었습니다.`, 'success');
+        
+        // 관리자 패널에서 입장한 경우 관리자 패널로 돌아가고, 그렇지 않으면 초기 화면으로
+        if (isFromAdminPanel) {
+            leaveRoom();
+        } else {
+            loadAllRooms();
+        }
+    } catch (error) {
+        console.error('룸 삭제 실패:', error);
+        showNotification('룸 삭제에 실패했습니다.', 'error');
+    }
+}
+
+// 현재 룸 삭제
+async function deleteCurrentRoom() {
+    if (!currentRoom) return;
+    
+    if (confirm(`룸 ${currentRoom}을(를) 정말 삭제하시겠습니까?`)) {
+        const roomCode = currentRoom;
+        leaveRoom();
+        await deleteRoom(roomCode);
+    }
+}
+
+// 영구 보관 토글 (관리자 전용)
+async function togglePermanent(roomCode, permanent) {
+    if (!isAdmin()) {
+        showNotification('관리자 권한이 필요합니다.', 'error');
+        return;
+    }
+    
+    try {
+        await database.ref(`${RTDB_PATH.CLIPBOARD}/${roomCode}/permanent`).set(permanent);
+        showNotification(permanent ? '영구 보관으로 설정되었습니다.' : '영구 보관이 해제되었습니다.', 'success');
+        
+        // 현재 룸인 경우 배지 업데이트
+        if (currentRoom === roomCode) {
+            permanentBadge.style.display = permanent ? 'inline-block' : 'none';
+            
+            // 영구 보관 버튼 아이콘 업데이트
+            if (permanent) {
+                togglePermanentRoomBtn.textContent = '🔓';
+                togglePermanentRoomBtn.title = '영구 보관 해제';
+                togglePermanentRoomBtn.classList.add('permanent');
+            } else {
+                togglePermanentRoomBtn.textContent = '🔒';
+                togglePermanentRoomBtn.title = '영구 보관 설정';
+                togglePermanentRoomBtn.classList.remove('permanent');
+            }
+        }
+        
+        loadAllRooms();
+    } catch (error) {
+        console.error('영구 보관 설정 실패:', error);
+        showNotification('영구 보관 설정에 실패했습니다.', 'error');
+    }
+}
+
+// 현재 룸 영구 보관 토글
+async function toggleCurrentRoomPermanent() {
+    if (!currentRoom) return;
+    
+    const snapshot = await database.ref(`${RTDB_PATH.CLIPBOARD}/${currentRoom}/permanent`).once('value');
+    const isPermanent = snapshot.val() || false;
+    
+    await togglePermanent(currentRoom, !isPermanent);
 }
 
 // 인증 상태 변경 리스너
@@ -498,6 +788,25 @@ function setupEventListeners() {
     // 로그인/로그아웃
     loginBtn.addEventListener('click', loginWithGoogle);
     logoutBtn.addEventListener('click', logout);
+    
+    // 관리자 패널
+    adminPanelBtn.addEventListener('click', openAdminPanel);
+    closeAdminBtn.addEventListener('click', closeAdminPanel);
+    
+    // 관리자 패널 필터
+    normalRoomsCard.addEventListener('click', () => {
+        adminRoomFilter = 'normal';
+        normalRoomsCard.style.opacity = '1';
+        permanentRoomsCard.style.opacity = '0.7';
+        loadAllRooms();
+    });
+    
+    permanentRoomsCard.addEventListener('click', () => {
+        adminRoomFilter = 'permanent';
+        permanentRoomsCard.style.opacity = '1';
+        normalRoomsCard.style.opacity = '0.7';
+        loadAllRooms();
+    });
     
     // 룸 생성/입장
     createRoomBtn.addEventListener('click', createRoom);
@@ -524,6 +833,12 @@ function setupEventListeners() {
     
     // 룸 나가기
     leaveRoomBtn.addEventListener('click', leaveRoom);
+    
+    // 관리자 전용: 현재 룸 삭제
+    deleteRoomBtn.addEventListener('click', deleteCurrentRoom);
+    
+    // 관리자 전용: 현재 룸 영구 보관 토글
+    togglePermanentRoomBtn.addEventListener('click', toggleCurrentRoomPermanent);
     
     // 룸 코드 복사
     copyRoomCodeBtn.addEventListener('click', copyRoomCode);

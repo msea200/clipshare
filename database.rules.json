@@ -1,10 +1,14 @@
 {
   "rules": {
     "clipboard": {
+      ".read": "auth != null && (auth.token.email == 'msea200@gmail.com' || auth.token.email == 'bkcode200@gmail.com')",
       "$roomCode": {
         ".read": true,
-        ".write": true,
-        ".indexOn": ["expiresAt", "lastUpdated"]
+        ".write": "auth != null && (auth.token.email == 'msea200@gmail.com' || auth.token.email == 'bkcode200@gmail.com' || !data.exists())",
+        ".indexOn": ["expiresAt", "lastUpdated", "permanent"],
+        "permanent": {
+          ".write": "auth != null && (auth.token.email == 'msea200@gmail.com' || auth.token.email == 'bkcode200@gmail.com')"
+        }
       }
     }
   }

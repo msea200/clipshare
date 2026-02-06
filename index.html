@@ -21,6 +21,9 @@
                             <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" class="google-icon">
                             Google 로그인
                         </button>
+                        <button id="adminPanelBtn" class="btn btn-secondary" style="display: none; width: auto; padding: 0.75rem 1.5rem;">
+                            🛠️ 관리자 패널
+                        </button>
                         <div id="userInfo" class="user-info" style="display: none;">
                             <img id="userPhoto" class="user-photo" alt="User">
                             <div class="user-details">
@@ -62,6 +65,29 @@
             </div>
         </div>
 
+        <!-- 관리자 패널 -->
+        <div id="adminPanel" class="admin-panel" style="display: none;">
+            <div class="admin-header">
+                <h2>🛠️ 관리자 패널</h2>
+                <button id="closeAdminBtn" class="btn btn-secondary">닫기</button>
+            </div>
+            <div class="admin-content">
+                <div class="admin-stats">
+                    <div class="stat-card" id="normalRoomsCard" style="cursor: pointer;">
+                        <div class="stat-value" id="normalRooms">0</div>
+                        <div class="stat-label">일반 룸</div>
+                    </div>
+                    <div class="stat-card" id="permanentRoomsCard" style="cursor: pointer; opacity: 0.7;">
+                        <div class="stat-value" id="permanentRooms">0</div>
+                        <div class="stat-label">영구 룸</div>
+                    </div>
+                </div>
+                <div class="admin-rooms" id="adminRoomList">
+                    <!-- 룸 목록이 여기에 표시됩니다 -->
+                </div>
+            </div>
+        </div>
+
         <!-- 클립보드 공유 화면 -->
         <div id="clipboardArea" class="clipboard-area" style="display: none;">
             <div class="room-info">
@@ -69,12 +95,17 @@
                     <span class="label">룸 코드:</span>
                     <span id="currentRoomCode" class="room-code"></span>
                     <button id="copyRoomCodeBtn" class="btn-icon" title="룸 코드 복사">📋</button>
+                    <span id="permanentBadge" class="permanent-badge" style="display: none;">🔒 영구 보관</span>
                 </div>
                 <div class="connection-status">
                     <span id="connectionStatus" class="status-indicator">⚫</span>
                     <span id="connectionText">연결 중...</span>
                 </div>
-                <button id="leaveRoomBtn" class="btn btn-leave">나가기</button>
+                <div class="room-actions">
+                    <button id="togglePermanentRoomBtn" class="btn-icon-sm" style="display: none;" title="영구 보관 토글">🔒</button>
+                    <button id="deleteRoomBtn" class="btn-icon-sm danger" style="display: none;" title="룸 삭제">🗑️</button>
+                    <button id="leaveRoomBtn" class="btn btn-leave">나가기</button>
+                </div>
             </div>
 
             <div class="clipboard-content">
@@ -133,6 +164,7 @@
 
     <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
     
     <!-- App Scripts -->
