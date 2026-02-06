@@ -27,7 +27,9 @@ const notification = document.getElementById('notification');
 let currentRoom = null;
 let roomRef = null;
 let clipboardsRef = null;
+let tempTextRef = null;
 let isUpdatingFromFirebase = false;
+let isUpdatingTempText = false;
 
 // 룸 코드 생성 (ABC-123 형식)
 function generateRoomCode() {
@@ -173,6 +175,7 @@ async function joinRoom(roomCode) {
         currentRoomCode.textContent = formattedCode;
         roomRef = database.ref(`${RTDB_PATH.CLIPBOARD}/${formattedCode}`);
         clipboardsRef = roomRef.child('clipboards');
+        tempTextRef = roomRef.child('tempText');
         
         // UI 전환
         roomSelection.style.display = 'none';
@@ -180,6 +183,9 @@ async function joinRoom(roomCode) {
         
         // 초기 클립보드 목록 로드
         loadClipboards();
+        
+        // 초기 임시 텍스트 로드
+        loadTempText();
         
         // 실시간 리스너 설정
         setupRealtimeListener();
@@ -200,6 +206,23 @@ async function loadClipboards() {
         renderClipboards(clipboards);
     } catch (error) {
         console.error('클립보드 로드 실패:', error);
+    }
+}
+
+// 임시 텍스트 로드
+async function loadTempText() {
+    try {
+        const snapshot = await tempTextRef.once('value');
+        const text = snapshot.val();
+        
+        if (text) {
+            isUpdatingTempText = true;
+            newClipboardText.value = text;
+            updateCharCount();
+            isUpdatingTempText = false;
+        }
+    } catch (error) {
+        console.error('임시 텍스트 로드 실패:', error);
     }
 }
 
@@ -275,6 +298,21 @@ async function deleteClipboard(id) {
     }
 }
 
+// 임시 텍스트 업데이트 (디바운싱)
+let tempTextTimeout = null;
+function updateTempText() {
+    if (isUpdatingTempText) return;
+    
+    clearTimeout(tempTextTimeout);
+    tempTextTimeout = setTimeout(async () => {
+        try {
+            await tempTextRef.set(newClipboardText.value);
+        } catch (error) {
+            console.error('임시 텍스트 업데이트 실패:', error);
+        }
+    }, 300); // 300ms 디바운싱
+}
+
 // 새 클립보드 추가
 async function addClipboard() {
     const text = newClipboardText.value.trim();
@@ -291,17 +329,31 @@ async function addClipboard() {
             createdAt: firebase.database.ServerValue.TIMESTAMP
         });
         
-        // 입력 필드 초기화
+        // 입력 필드 및 임시 텍스트 초기화
+        isUpdatingTempText = true;
         newClipboardText.value = '';
         updateCharCount();
-        
-        showNotification('클립보드가 추가되었습니다!', 'success');
-    } catch (error) {
-        console.error('클립보드 추가 실패:', error);
-        showNotification('추가에 실패했습니다.', 'error');
-    }
-}
-
+        await tempTextRef.set('');
+        isUpdatingTempText = false
+    
+    // 클립보드 목록 변경 리스너
+    clipboardsRef.on('value', (snapshot) => {
+        if (!isUpdatingFromFirebase) {
+            isUpdatingFromFirebase = true;
+            const clipboards = snapshot.val();
+            renderClipboards(clipboards);
+            isUpdatingFromFirebase = false;
+        }
+    });
+    
+    // 임시 텍스트 실시간 동기화 리스너
+    tempTextRef.on('value', (snapshot) => {
+        if (!isUpdatingTempText) {
+            isUpdatingTempText = true;
+            const text = snapshot.val() || '';
+            newClipboardText.value = text;
+            updateCharCount();
+            isUpdatingTempText
 // 실시간 리스너 설정
 function setupRealtimeListener() {
     if (!roomRef || !clipboardsRef) return;
@@ -333,9 +385,14 @@ function updateText() {
         try {
             await roomRef.update({
                 lastUpdated: firebase.database.ServerValue.TIMESTAMP
-            });
-        } catch (error) {
-            console.error('업데이트 실패:', error);
+    if (tempTextRef) {
+        tempTextRef.off();
+    }
+    
+    currentRoom = null;
+    roomRef = null;
+    clipboardsRef = null;
+    tempTextnsole.error('업데이트 실패:', error);
         }
     }, UPDATE_DEBOUNCE_MS);
 }
@@ -448,6 +505,7 @@ roomCodeInput.addEventListener('keypress', (e) => {
 });
 
 leaveRoomBtn.addEventListener('click', leaveRoom);
+    updateTempText(); // 실시간 동기화
 addClipboardBtn.addEventListener('click', addClipboard);
 copyRoomCodeBtn.addEventListener('click', copyRoomCode);
 
