@@ -4,23 +4,7 @@
       "$roomCode": {
         ".read": true,
         ".write": true,
-        ".indexOn": ["expiresAt", "lastUpdated"],
-        ".validate": "newData.hasChildren(['code', 'text', 'createdAt', 'lastUpdated', 'expiresAt'])",
-        "code": {
-          ".validate": "newData.isString() && newData.val().length === 7"
-        },
-        "text": {
-          ".validate": "newData.isString() && newData.val().length <= 10000"
-        },
-        "createdAt": {
-          ".validate": "newData.isNumber()"
-        },
-        "lastUpdated": {
-          ".validate": "newData.isNumber()"
-        },
-        "expiresAt": {
-          ".validate": "newData.isNumber()"
-        }
+        ".indexOn": ["expiresAt", "lastUpdated"]
       }
     }
   }
