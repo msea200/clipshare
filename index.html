@@ -4,7 +4,19 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Easy Note - 간편한 노트 공유</title>
+    
+    <!-- PWA Meta Tags -->
+    <meta name="description" content="여러 기기에서 노트를 실시간으로 공유하세요">
+    <meta name="theme-color" content="#3498db">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="Easy Note">
+    
+    <!-- Icons -->
     <link rel="icon" type="image/png" href="favicon.png">
+    <link rel="apple-touch-icon" href="/icons/icon-152x152.png">
+    <link rel="manifest" href="/manifest.json">
+    
     <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
@@ -207,6 +219,19 @@
 
         <!-- 알림 메시지 -->
         <div id="notification" class="notification"></div>
+        
+        <!-- PWA 설치 프롬프트 -->
+        <div id="installPrompt" class="install-prompt" style="display: none;">
+            <div class="install-prompt-content">
+                <div class="install-prompt-icon">📱</div>
+                <div class="install-prompt-text">
+                    <h4>앱으로 설치하기</h4>
+                    <p>홈 화면에 추가하여 앱처럼 사용하세요</p>
+                </div>
+                <button id="installBtn" class="btn btn-primary">설치</button>
+                <button id="dismissInstallBtn" class="btn btn-secondary">나중에</button>
+            </div>
+        </div>
     </div>
 
     <!-- Firebase SDK -->

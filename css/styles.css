@@ -948,3 +948,105 @@ header .subtitle {
         justify-content: flex-end;
     }
 }
+
+/* PWA 설치 프롬프트 */
+.install-prompt {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: linear-gradient(180deg, rgba(79, 70, 229, 0.95) 0%, rgba(67, 56, 202, 0.95) 100%);
+    padding: 1.5rem;
+    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.15);
+    z-index: 10000;
+    animation: slideUp 0.3s ease-out;
+}
+
+@keyframes slideUp {
+    from {
+        transform: translateY(100%);
+    }
+    to {
+        transform: translateY(0);
+    }
+}
+
+.install-prompt-content {
+    max-width: 800px;
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.install-prompt-icon {
+    font-size: 2.5rem;
+}
+
+.install-prompt-text {
+    flex: 1;
+    min-width: 200px;
+    color: white;
+}
+
+.install-prompt-text h4 {
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin-bottom: 0.25rem;
+}
+
+.install-prompt-text p {
+    font-size: 0.9rem;
+    opacity: 0.9;
+}
+
+.install-prompt .btn {
+    white-space: nowrap;
+}
+
+.install-prompt .btn-primary {
+    background: white;
+    color: var(--primary-color);
+}
+
+.install-prompt .btn-primary:hover {
+    background: #f8fafc;
+}
+
+.install-prompt .btn-secondary {
+    background: rgba(255, 255, 255, 0.2);
+    color: white;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.install-prompt .btn-secondary:hover {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+@media (max-width: 640px) {
+    .install-prompt {
+        padding: 1rem;
+    }
+    
+    .install-prompt-content {
+        gap: 0.75rem;
+    }
+    
+    .install-prompt-icon {
+        font-size: 2rem;
+    }
+    
+    .install-prompt-text h4 {
+        font-size: 1rem;
+    }
+    
+    .install-prompt-text p {
+        font-size: 0.85rem;
+    }
+    
+    .install-prompt .btn {
+        flex: 1;
+        min-width: 0;
+    }
+}

@@ -1,6 +1,46 @@
 // 클립보드 공유 앱
 import { firebaseConfig, APP_NAME, APP_VERSION, RTDB_PATH, ROOM_EXPIRY_HOURS, MAX_TEXT_LENGTH, UPDATE_DEBOUNCE_MS } from './config.js';
 
+// Service Worker 등록 (PWA)
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/service-worker.js')
+            .then((registration) => {
+                console.log('✅ Service Worker 등록 성공:', registration.scope);
+                
+                // 업데이트 확인
+                registration.addEventListener('updatefound', () => {
+                    const newWorker = registration.installing;
+                    newWorker.addEventListener('statechange', () => {
+                        if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                            console.log('🔄 새 버전 사용 가능');
+                            showNotification('새 버전이 있습니다. 새로고침하세요.', 'info');
+                        }
+                    });
+                });
+            })
+            .catch((error) => {
+                console.error('❌ Service Worker 등록 실패:', error);
+            });
+    });
+}
+
+// PWA 설치 프롬프트
+let deferredPrompt;
+window.addEventListener('beforeinstallprompt', (e) => {
+    console.log('💡 PWA 설치 가능');
+    e.preventDefault();
+    deferredPrompt = e;
+    
+    // 설치 버튼 표시 (나중에 추가 가능)
+    showNotification('홈 화면에 추가할 수 있습니다', 'info');
+});
+
+window.addEventListener('appinstalled', () => {
+    console.log('✅ PWA 설치 완료');
+    deferredPrompt = null;
+});
+
 // Firebase 초기화
 firebase.initializeApp(firebaseConfig);
 const database = firebase.database();
@@ -51,6 +91,9 @@ const joinDateRoomBtn = document.getElementById('joinDateRoomBtn');
 const dateRoomList = document.getElementById('dateRoomList');
 const dateRoomItems = document.getElementById('dateRoomItems');
 const voiceRecordBtn = document.getElementById('voiceRecordBtn');
+const installPrompt = document.getElementById('installPrompt');
+const installBtn = document.getElementById('installBtn');
+const dismissInstallBtn = document.getElementById('dismissInstallBtn');
 
 // 상태 관리
 let currentRoom = null;
@@ -766,7 +809,11 @@ function attachClipboardItemListeners() {
         btn.addEventListener('click', async (e) => {
             const item = e.target.closest('.clipboard-item');
             const id = item.dataset.id;
-            await deleteClipboard(id);
+            
+            // 삭제 확인
+            if (confirm('이 노트를 삭제하시겠습니까?')) {
+                await deleteClipboard(id);
+            }
         });
     });
 }
@@ -1341,6 +1388,57 @@ function initApp() {
     
     setupEventListeners();
     console.log('앱이 준비되었습니다.');
+    
+    // PWA 설치 프롬프트 설정
+    setupPWAInstallPrompt();
+}
+
+// PWA 설치 프롬프트 설정
+function setupPWAInstallPrompt() {
+    if (!installBtn || !dismissInstallBtn || !installPrompt) return;
+    
+    // 설치 버튼 클릭
+    installBtn.addEventListener('click', async () => {
+        if (!deferredPrompt) return;
+        
+        deferredPrompt.prompt();
+        const { outcome } = await deferredPrompt.userChoice;
+        
+        console.log(`PWA 설치 선택: ${outcome}`);
+        
+        if (outcome === 'accepted') {
+            showNotification('앱 설치 중...', 'success');
+        }
+        
+        deferredPrompt = null;
+        installPrompt.style.display = 'none';
+    });
+    
+    // 나중에 버튼 클릭
+    dismissInstallBtn.addEventListener('click', () => {
+        installPrompt.style.display = 'none';
+        localStorage.setItem('pwa-install-dismissed', Date.now().toString());
+    });
+    
+    // beforeinstallprompt 이벤트 리스너 (전역에서 이미 설정됨)
+    window.addEventListener('beforeinstallprompt', (e) => {
+        // 이전에 거부했는지 확인 (7일 이내)
+        const dismissedTime = localStorage.getItem('pwa-install-dismissed');
+        if (dismissedTime) {
+            const daysSinceDismissed = (Date.now() - parseInt(dismissedTime)) / (1000 * 60 * 60 * 24);
+            if (daysSinceDismissed < 7) {
+                console.log('PWA 설치 프롬프트 숨김 (최근 거부됨)');
+                return;
+            }
+        }
+        
+        // 프롬프트 표시
+        setTimeout(() => {
+            if (installPrompt) {
+                installPrompt.style.display = 'block';
+            }
+        }, 3000); // 3초 후 표시
+    });
 }
 
 // 앱 시작
