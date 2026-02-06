@@ -11,9 +11,9 @@ export const firebaseConfig = {
     databaseURL: "https://clip2share-default-rtdb.asia-southeast1.firebasedatabase.app/"
 };
 // App Configuration
-export const APP_NAME = "Clipboard Share";
+export const APP_NAME = "Easy Note";
 export const APP_VERSION = "1.0.0";
-export const APP_BUILD = "2026-02-06";
+export const APP_BUILD = "2026-02-07";
 
 // RTDB Path
 export const RTDB_PATH = {

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>클립보드 공유 - Clipboard Share</title>
+    <title>Easy Note - 간편한 노트 공유</title>
     <link rel="icon" type="image/png" href="favicon.png">
     <link rel="stylesheet" href="css/styles.css">
 </head>
@@ -12,8 +12,8 @@
         <header>
             <div class="header-content">
                 <div class="header-left">
-                    <h1>📋 클립보드 공유</h1>
-                    <p class="subtitle">여러 PC 간 텍스트를 실시간으로 공유하세요</p>
+                    <h1>📝 Easy Note</h1>
+                    <p class="subtitle">여러 기기에서 노트를 실시간으로 공유하세요</p>
                 </div>
                 <div class="header-right">
                     <div id="authContainer" class="auth-container">
@@ -40,9 +40,10 @@
         <!-- 룸 선택 화면 -->
         <div id="roomSelection" class="room-selection">
             <div class="room-card">
-                <h2>새 룸 만들기</h2>
-                <button id="createRoomBtn" class="btn btn-primary">
-                    <span>🚀</span> 새 룸 생성
+                <h2>📅 오늘 방 입장</h2>
+                <p class="room-card-desc">오늘 날짜로 생성된 기본 방에 바로 입장합니다</p>
+                <button id="joinTodayRoomBtn" class="btn btn-primary">
+                    <span>📅</span> 오늘 방 입장 (<span id="todayRoomCode"></span>)
                 </button>
             </div>
 
@@ -51,17 +52,56 @@
             </div>
 
             <div class="room-card">
-                <h2>기존 룸 입장</h2>
-                <input 
-                    type="text" 
-                    id="roomCodeInput" 
-                    class="room-input" 
-                    placeholder="룸 코드 입력 (예: ABC-123)"
-                    maxlength="7"
-                >
-                <button id="joinRoomBtn" class="btn btn-secondary">
-                    <span>🔗</span> 룸 입장
+                <h2>🆕 새 방 만들기</h2>
+                <p class="room-card-desc">오늘 날짜의 새로운 번호 방을 생성합니다</p>
+                <button id="createRoomBtn" class="btn btn-primary">
+                    <span>🚀</span> 새 방 생성
                 </button>
+            </div>
+
+            <div class="divider">
+                <span>또는</span>
+            </div>
+
+            <div class="room-card">
+                <h2>🔗 날짜별 보기</h2>
+                <p class="room-card-desc">과거 날짜의 방에 입장합니다</p>
+                
+                <div style="display: flex; gap: 0.5rem; align-items: stretch; margin-bottom: 0.5rem;">
+                    <input 
+                        type="date" 
+                        id="datePickerInput" 
+                        class="room-input" 
+                        style="flex: 1; min-width: 0; height: 44px;"
+                    >
+                    <button id="joinDateRoomBtn" class="btn btn-secondary" style="flex: 0 0 70px; white-space: nowrap; height: 44px; padding: 0 0.5rem;">
+                        <span>📅</span> 조회
+                    </button>
+                </div>
+                
+                <div style="display: flex; gap: 0.5rem; align-items: stretch;">
+                    <input 
+                        type="text" 
+                        id="roomCodeInput" 
+                        class="room-input" 
+                        placeholder=""
+                        maxlength="10"
+                        style="flex: 1; min-width: 0; height: 44px;"
+                    >
+                    <button id="joinRoomBtn" class="btn btn-secondary" style="flex: 0 0 70px; white-space: nowrap; height: 44px; padding: 0 0.5rem;">
+                        <span>🔗</span> 입장
+                    </button>
+                </div>
+                
+                <!-- 날짜별 방 목록 -->
+                <div id="dateRoomList" style="display: none; margin-top: 1rem;">
+                    <div style="font-size: 0.9rem; font-weight: 600; margin-bottom: 0.5rem; color: #555;">
+                        선택한 날짜의 방 목록
+                    </div>
+                    <div id="dateRoomItems" style="max-height: 200px; overflow-y: auto;">
+                        <!-- 방 목록이 여기에 표시됩니다 -->
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -110,18 +150,28 @@
 
             <div class="clipboard-content">
                 <div class="content-header">
-                    <h3>공유된 클립보드</h3>
+                    <h3>기록완료 노트</h3>
                     <div class="clipboard-count">
-                        <span id="clipboardCount">0</span>개의 클립보드
+                        <span id="clipboardCount">0</span>개의 노트
                     </div>
                 </div>
 
-                <!-- 새 클립보드 추가 영역 -->
+                <!-- 노트 추가 버튼 -->
+                <div style="margin-bottom: 1rem; display: flex; gap: 0.5rem;">
+                    <button id="voiceRecordBtn" class="btn btn-secondary" style="flex: 1;">
+                        <span>🎤</span> 말로 쓰기
+                    </button>
+                    <button id="addClipboardBtn" class="btn btn-primary" style="flex: 1;">
+                        <span>➕</span> 노트 추가
+                    </button>
+                </div>
+
+                <!-- 새 노트 추가 영역 -->
                 <div class="new-clipboard">
                     <textarea 
                         id="newClipboardText" 
                         class="clipboard-textarea" 
-                        placeholder="새 클립보드 내용을 입력하거나 붙여넣으세요..."
+                        placeholder="새 노트 내용을 입력하거나 붙여넣으세요..."
                         maxlength="10000"
                         rows="3"
                     ></textarea>
@@ -129,19 +179,16 @@
                         <div class="char-count">
                             <span id="newCharCount">0</span> / 10,000 자
                         </div>
-                        <button id="addClipboardBtn" class="btn btn-primary">
-                            <span>➕</span> 클립보드 추가
-                        </button>
                     </div>
                 </div>
 
                 <!-- 클립보드 목록 -->
                 <div class="clipboard-list">
                     <div id="clipboardItems" class="clipboard-items">
-                        <!-- 클립보드 아이템들이 여기에 동적으로 추가됩니다 -->
+                        <!-- 노트 아이템들이 여기에 동적으로 추가됩니다 -->
                         <div class="empty-state">
-                            <p>📋 아직 공유된 클립보드가 없습니다.</p>
-                            <p>위에서 새 클립보드를 추가해보세요!</p>
+                            <p>📝 아직 공유된 노트가 없습니다.</p>
+                            <p>위에서 새 노트를 추가해보세요!</p>
                         </div>
                     </div>
                 </div>
@@ -150,9 +197,9 @@
             <div class="info-section">
                 <h4>💡 사용 팁</h4>
                 <ul>
-                    <li>룸 코드를 다른 PC에 공유하여 같은 룸에 입장하세요</li>
-                    <li>텍스트가 자동으로 저장되며 실시간으로 동기화됩니다</li>
-                    <li>룸은 24시간 후 자동으로 삭제됩니다</li>
+                    <li>방 코드를 다른 기기에 공유하여 같은 방에 입장하세요</li>
+                    <li>노트가 자동으로 저장되며 실시간으로 동기화됩니다</li>
+                    <li>방은 24시간 후 자동으로 삭제됩니다</li>
                     <li>민감한 정보는 공유하지 마세요</li>
                 </ul>
             </div>

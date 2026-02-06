@@ -44,6 +44,13 @@ const permanentRoomsCard = document.getElementById('permanentRoomsCard');
 const permanentBadge = document.getElementById('permanentBadge');
 const togglePermanentRoomBtn = document.getElementById('togglePermanentRoomBtn');
 const deleteRoomBtn = document.getElementById('deleteRoomBtn');
+const joinTodayRoomBtn = document.getElementById('joinTodayRoomBtn');
+const todayRoomCode = document.getElementById('todayRoomCode');
+const datePickerInput = document.getElementById('datePickerInput');
+const joinDateRoomBtn = document.getElementById('joinDateRoomBtn');
+const dateRoomList = document.getElementById('dateRoomList');
+const dateRoomItems = document.getElementById('dateRoomItems');
+const voiceRecordBtn = document.getElementById('voiceRecordBtn');
 
 // 상태 관리
 let currentRoom = null;
@@ -56,22 +63,65 @@ let tempTextTimeout = null;
 let currentUser = null;
 let isFromAdminPanel = false; // 관리자 패널에서 입장했는지 여부
 let adminRoomFilter = 'normal'; // 'normal' or 'permanent'
+let recognition = null; // 음성 인식 객체
+let isRecording = false; // 음성 녹음 중인지
+let silenceTimer = null; // 무음 타이머
 
-// 룸 코드 생성 (ABC-123 형식)
-function generateRoomCode() {
-    const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-    const numbers = '0123456789';
+// 룸 코드 생성 (YYMMDD-001 형식)
+async function generateRoomCode() {
+    const today = new Date();
+    const yy = String(today.getFullYear()).slice(-2);
+    const mm = String(today.getMonth() + 1).padStart(2, '0');
+    const dd = String(today.getDate()).padStart(2, '0');
+    const datePrefix = `${yy}${mm}${dd}`;
     
-    let code = '';
-    for (let i = 0; i < 3; i++) {
-        code += letters.charAt(Math.floor(Math.random() * letters.length));
+    // 오늘 날짜로 시작하는 룸 검색
+    try {
+        const snapshot = await database.ref(RTDB_PATH.CLIPBOARD).once('value');
+        const rooms = snapshot.val();
+        
+        if (!rooms) {
+            return `${datePrefix}-001`;
+        }
+        
+        // 오늘 날짜 룸들 찾기
+        const todayRooms = Object.keys(rooms).filter(code => code.startsWith(datePrefix));
+        
+        if (todayRooms.length === 0) {
+            return `${datePrefix}-001`;
+        }
+        
+        // 가장 큰 번호 찾기
+        const maxNumber = Math.max(...todayRooms.map(code => {
+            const parts = code.split('-');
+            return parts.length > 1 ? parseInt(parts[1]) || 0 : 0;
+        }));
+        
+        const nextNumber = String(maxNumber + 1).padStart(3, '0');
+        return `${datePrefix}-${nextNumber}`;
+    } catch (error) {
+        console.error('룸 코드 생성 실패:', error);
+        return `${datePrefix}-001`;
     }
-    code += '-';
-    for (let i = 0; i < 3; i++) {
-        code += numbers.charAt(Math.floor(Math.random() * numbers.length));
-    }
-    
-    return code;
+}
+
+// 오늘 날짜 룸 코드 가져오기 (YYMMDD)
+function getTodayRoomCode() {
+    const today = new Date();
+    const yy = String(today.getFullYear()).slice(-2);
+    const mm = String(today.getMonth() + 1).padStart(2, '0');
+    const dd = String(today.getDate()).padStart(2, '0');
+    return `${yy}${mm}${dd}`;
+}
+
+// 어제 날짜 룸 코드 가져오기 (YYMMDD)
+function getYesterdayRoomCode() {
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yy = String(yesterday.getFullYear()).slice(-2);
+    const mm = String(yesterday.getMonth() + 1).padStart(2, '0');
+    const dd = String(yesterday.getDate()).padStart(2, '0');
+    return `${yy}${mm}${dd}`;
 }
 
 // 알림 표시
@@ -101,6 +151,247 @@ function updateConnectionStatus(connected) {
 function updateCharCount() {
     const count = newClipboardText.value.length;
     newCharCount.textContent = count.toLocaleString();
+}
+
+// 음성 인식 초기화
+function initVoiceRecognition() {
+    // 브라우저 정보 로그
+    console.log('User Agent:', navigator.userAgent);
+    console.log('webkitSpeechRecognition:', 'webkitSpeechRecognition' in window);
+    console.log('SpeechRecognition:', 'SpeechRecognition' in window);
+    
+    // 브라우저 지원 확인
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    
+    if (!SpeechRecognition) {
+        console.warn('음성 인식을 지원하지 않는 브라우저입니다.');
+        console.warn('현재 브라우저:', navigator.userAgent);
+        return null;
+    }
+    
+    try {
+        console.log('SpeechRecognition 초기화 중...');
+        const recognitionInstance = new SpeechRecognition();
+        recognitionInstance.lang = 'ko-KR';
+        recognitionInstance.continuous = false; // 모바일 호환성을 위해 false로 변경
+        recognitionInstance.interimResults = true;
+        recognitionInstance.maxAlternatives = 1;
+        
+        recognitionInstance.onstart = () => {
+            console.log('✅ onstart 이벤트 발생 - 음성 인식 시작됨');
+            isRecording = true;
+            if (voiceRecordBtn) {
+                voiceRecordBtn.innerHTML = '<span>⏹️</span> 기록 종료';
+                voiceRecordBtn.style.background = '#e74c3c';
+                voiceRecordBtn.disabled = false;
+            } else {
+                console.error('voiceRecordBtn이 null입니다!');
+            }
+            showNotification('🎤 음성 기록 중... 말씀하세요', 'info');
+            resetSilenceTimer();
+        };
+        
+        recognitionInstance.onresult = (event) => {
+            console.log('음성 인식 결과:', event.results);
+            resetSilenceTimer();
+            let finalTranscript = '';
+            let interimTranscript = '';
+            
+            for (let i = event.resultIndex; i < event.results.length; i++) {
+                const transcript = event.results[i][0].transcript;
+                if (event.results[i].isFinal) {
+                    finalTranscript += transcript;
+                } else {
+                    interimTranscript += transcript;
+                }
+            }
+            
+            if (finalTranscript) {
+                const currentText = newClipboardText.value;
+                newClipboardText.value = currentText + (currentText ? ' ' : '') + finalTranscript;
+                updateCharCount();
+                
+                // continuous가 false일 때 자동으로 재시작
+                if (isRecording) {
+                    setTimeout(() => {
+                        if (isRecording) {
+                            try {
+                                recognitionInstance.start();
+                            } catch (e) {
+                                console.log('재시작 오류 무시:', e);
+                            }
+                        }
+                    }, 300);
+                }
+            }
+        };
+        
+        recognitionInstance.onerror = (event) => {
+            console.error('음성 인식 오류:', event.error);
+            
+            if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+                showNotification('마이크 권한을 허용해주세요.', 'error');
+                stopVoiceRecognition();
+            } else if (event.error === 'no-speech') {
+                console.log('음성이 감지되지 않음, 재시작 시도');
+                if (isRecording) {
+                    setTimeout(() => {
+                        if (isRecording) {
+                            try {
+                                recognitionInstance.start();
+                            } catch (e) {
+                                console.log('재시작 오류 무시:', e);
+                            }
+                        }
+                    }, 300);
+                }
+            } else if (event.error !== 'aborted') {
+                showNotification(`음성 인식 오류: ${event.error}`, 'error');
+                stopVoiceRecognition();
+            }
+        };
+        
+        recognitionInstance.onend = () => {
+            console.log('음성 인식 종료됨');
+            if (isRecording) {
+                // continuous가 false일 때 자동 재시작
+                setTimeout(() => {
+                    if (isRecording) {
+                        try {
+                            recognitionInstance.start();
+                        } catch (e) {
+                            console.log('자동 재시작 실패:', e);
+                        }
+                    }
+                }, 100);
+            }
+        };
+        
+        return recognitionInstance;
+    } catch (error) {
+        console.error('음성 인식 초기화 실패:', error);
+        return null;
+    }
+}
+
+// 음성 인식 시작/종료 토글
+async function toggleVoiceRecognition() {
+    console.log('toggleVoiceRecognition 호출됨, isRecording:', isRecording);
+    
+    if (isRecording) {
+        stopVoiceRecognition();
+        return;
+    }
+    
+    // 버튼 상태를 먼저 변경 (즉시 피드백)
+    if (voiceRecordBtn) {
+        voiceRecordBtn.innerHTML = '<span>⏳</span> 준비 중...';
+        voiceRecordBtn.disabled = true;
+    }
+    
+    // 마이크 권한 먼저 확인
+    try {
+        console.log('마이크 권한 요청 중...');
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        console.log('마이크 권한 허용됨');
+        stream.getTracks().forEach(track => track.stop()); // 즉시 중지
+    } catch (error) {
+        console.error('마이크 권한 오류:', error);
+        showNotification('마이크 권한이 필요합니다. 브라우저 설정에서 마이크 권한을 허용해주세요.', 'error');
+        if (voiceRecordBtn) {
+            voiceRecordBtn.innerHTML = '<span>🎤</span> 말로 쓰기';
+            voiceRecordBtn.disabled = false;
+        }
+        return;
+    }
+    
+    if (!recognition) {
+        console.log('음성 인식 객체 초기화 시도...');
+        recognition = initVoiceRecognition();
+        if (!recognition) {
+            const userAgent = navigator.userAgent.toLowerCase();
+            let message = '이 브라우저는 음성 인식을 지원하지 않습니다.';
+            
+            if (userAgent.includes('android')) {
+                message = 'Chrome 브라우저를 사용해주세요. (삼성 인터넷은 지원하지 않음)';
+            } else if (userAgent.includes('iphone') || userAgent.includes('ipad')) {
+                message = 'iOS에서는 음성 인식이 제한적으로 지원됩니다.';
+            }
+            
+            showNotification(message, 'error');
+            if (voiceRecordBtn) {
+                voiceRecordBtn.innerHTML = '<span>🎤</span> 말로 쓰기';
+                voiceRecordBtn.disabled = false;
+            }
+            return;
+        }
+    }
+    
+    try {
+        console.log('음성 인식 시작 시도...');
+        
+        // 즉시 UI 변경
+        isRecording = true;
+        if (voiceRecordBtn) {
+            voiceRecordBtn.innerHTML = '<span>⏹️</span> 기록 종료';
+            voiceRecordBtn.style.background = '#e74c3c';
+            voiceRecordBtn.disabled = false;
+        }
+        showNotification('말씀하세요...', 'info');
+        
+        recognition.start();
+        console.log('recognition.start() 호출됨');
+        resetSilenceTimer();
+        
+    } catch (error) {
+        console.error('음성 인식 시작 실패:', error);
+        isRecording = false;
+        
+        if (voiceRecordBtn) {
+            voiceRecordBtn.innerHTML = '<span>🎤</span> 말로 쓰기';
+            voiceRecordBtn.style.background = '';
+            voiceRecordBtn.disabled = false;
+        }
+        
+        if (error.name === 'InvalidStateError') {
+            console.log('이미 실행 중, 재초기화');
+            recognition = null;
+            setTimeout(() => toggleVoiceRecognition(), 500);
+        } else {
+            showNotification(`음성 인식 시작 실패: ${error.message}`, 'error');
+        }
+    }
+}
+
+// 음성 인식 종료
+function stopVoiceRecognition() {
+    if (recognition && isRecording) {
+        recognition.stop();
+        isRecording = false;
+        voiceRecordBtn.innerHTML = '<span>🎤</span> 말로 쓰기';
+        voiceRecordBtn.style.background = '';
+        clearSilenceTimer();
+        showNotification('음성 기록이 종료되었습니다.', 'info');
+    }
+}
+
+// 무음 타이머 리셋
+function resetSilenceTimer() {
+    clearSilenceTimer();
+    silenceTimer = setTimeout(() => {
+        if (isRecording) {
+            showNotification('30초간 음성이 감지되지 않아 자동 종료합니다.', 'info');
+            stopVoiceRecognition();
+        }
+    }, 30000); // 30초
+}
+
+// 무음 타이머 클리어
+function clearSilenceTimer() {
+    if (silenceTimer) {
+        clearTimeout(silenceTimer);
+        silenceTimer = null;
+    }
 }
 
 // 클립보드 개수 업데이트
@@ -163,7 +454,7 @@ function escapeHtml(text) {
 // 새 룸 만들기
 async function createRoom() {
     try {
-        const roomCode = generateRoomCode();
+        const roomCode = await generateRoomCode();
         const roomData = {
             code: roomCode,
             createdAt: firebase.database.ServerValue.TIMESTAMP,
@@ -175,11 +466,158 @@ async function createRoom() {
         
         await database.ref(`${RTDB_PATH.CLIPBOARD}/${roomCode}`).set(roomData);
         joinRoom(roomCode);
-        showNotification('새 룸이 생성되었습니다!', 'success');
+        showNotification(`새 방이 생성되었습니다! (${roomCode})`, 'success');
     } catch (error) {
         console.error('룸 생성 실패:', error);
         showNotification('룸 생성에 실패했습니다.', 'error');
     }
+}
+
+// 오늘 방 입장
+async function joinTodayRoom() {
+    const todayCode = getTodayRoomCode();
+    
+    try {
+        // 오늘 날짜 방이 있는지 확인
+        const snapshot = await database.ref(`${RTDB_PATH.CLIPBOARD}/${todayCode}`).once('value');
+        
+        if (snapshot.exists()) {
+            // 이미 존재하면 입장
+            joinRoom(todayCode);
+        } else {
+            // 없으면 생성하고 입장
+            const roomData = {
+                code: todayCode,
+                createdAt: firebase.database.ServerValue.TIMESTAMP,
+                lastUpdated: firebase.database.ServerValue.TIMESTAMP,
+                expiresAt: Date.now() + (ROOM_EXPIRY_HOURS * 60 * 60 * 1000),
+                clipboards: {},
+                tempText: ''
+            };
+            
+            await database.ref(`${RTDB_PATH.CLIPBOARD}/${todayCode}`).set(roomData);
+            joinRoom(todayCode);
+            showNotification(`오늘 방이 생성되었습니다! (${todayCode})`, 'success');
+        }
+    } catch (error) {
+        console.error('오늘 방 입장 실패:', error);
+        showNotification('오늘 방 입장에 실패했습니다.', 'error');
+    }
+}
+
+// 날짜 선택으로 방 목록 표시
+async function joinRoomByDate() {
+    const selectedDate = datePickerInput?.value;
+    
+    if (!selectedDate) {
+        showNotification('날짜를 선택해주세요.', 'error');
+        return;
+    }
+    
+    try {
+        // YYYY-MM-DD 형식을 YYMMDD로 변환
+        const [year, month, day] = selectedDate.split('-');
+        const yy = year.slice(-2);
+        const datePrefix = `${yy}${month}${day}`;
+        
+        // 전체 방 목록 가져오기
+        const snapshot = await database.ref(RTDB_PATH.CLIPBOARD).once('value');
+        const rooms = snapshot.val();
+        
+        if (!rooms) {
+            showNotification('해당 날짜의 방이 없습니다.', 'info');
+            dateRoomList.style.display = 'none';
+            return;
+        }
+        
+        // 선택한 날짜로 시작하는 방들 찾기
+        const dateRooms = Object.entries(rooms)
+            .filter(([code]) => code.startsWith(datePrefix))
+            .sort((a, b) => a[0].localeCompare(b[0]));
+        
+        if (dateRooms.length === 0) {
+            // 방이 없으면 생성할지 물어봄
+            if (confirm(`${datePrefix} 날짜의 방이 없습니다.\n새로 생성하시겠습니까?`)) {
+                const roomData = {
+                    code: datePrefix,
+                    createdAt: firebase.database.ServerValue.TIMESTAMP,
+                    lastUpdated: firebase.database.ServerValue.TIMESTAMP,
+                    expiresAt: Date.now() + (ROOM_EXPIRY_HOURS * 60 * 60 * 1000),
+                    clipboards: {},
+                    tempText: ''
+                };
+                
+                await database.ref(`${RTDB_PATH.CLIPBOARD}/${datePrefix}`).set(roomData);
+                joinRoom(datePrefix);
+                showNotification(`${datePrefix} 방이 생성되었습니다!`, 'success');
+            }
+            dateRoomList.style.display = 'none';
+            return;
+        }
+        
+        // 방 목록 표시
+        displayDateRooms(dateRooms);
+        dateRoomList.style.display = 'block';
+        
+    } catch (error) {
+        console.error('날짜로 방 조회 실패:', error);
+        showNotification('방 조회에 실패했습니다.', 'error');
+    }
+}
+
+// 날짜별 방 목록 표시
+function displayDateRooms(rooms) {
+    dateRoomItems.innerHTML = '';
+    
+    rooms.forEach(([code, data]) => {
+        const clipboardCount = data.clipboards ? Object.keys(data.clipboards).length : 0;
+        const isPermanent = data.permanent || false;
+        const createdTime = data.createdAt ? formatTime(data.createdAt) : '알 수 없음';
+        
+        const roomItem = document.createElement('div');
+        roomItem.className = 'date-room-item';
+        roomItem.style.cssText = `
+            padding: 0.75rem;
+            margin-bottom: 0.5rem;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            background: white;
+        `;
+        
+        roomItem.innerHTML = `
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <div style="font-weight: 600; font-size: 1rem; color: #333; margin-bottom: 0.25rem;">
+                        ${code}
+                        ${isPermanent ? '<span style="font-size: 0.8rem; color: #f39c12;">🔒</span>' : ''}
+                    </div>
+                    <div style="font-size: 0.85rem; color: #666;">
+                        📋 ${clipboardCount}개 · 🕐 ${createdTime}
+                    </div>
+                </div>
+                <div style="color: #3498db; font-size: 1.2rem;">→</div>
+            </div>
+        `;
+        
+        roomItem.addEventListener('mouseenter', () => {
+            roomItem.style.background = '#f8f9fa';
+            roomItem.style.borderColor = '#3498db';
+        });
+        
+        roomItem.addEventListener('mouseleave', () => {
+            roomItem.style.background = 'white';
+            roomItem.style.borderColor = '#e0e0e0';
+        });
+        
+        roomItem.addEventListener('click', () => {
+            joinRoom(code);
+            dateRoomList.style.display = 'none';
+        });
+        
+        dateRoomItems.appendChild(roomItem);
+    });
 }
 
 // 룸 입장
@@ -481,6 +919,11 @@ function leaveRoom() {
         roomSelection.style.display = 'block';
         adminPanel.style.display = 'none';
         isFromAdminPanel = false;
+        // 오늘 날짜 코드 다시 표시
+        const todayCodeElement = document.getElementById('todayRoomCode');
+        if (todayCodeElement) {
+            todayCodeElement.textContent = getTodayRoomCode();
+        }
         showNotification('룸에서 나갔습니다.', 'info');
     }
 }
@@ -494,21 +937,6 @@ async function copyRoomCode() {
         console.error('룸 코드 복사 실패:', error);
         showNotification('복사에 실패했습니다.', 'error');
     }
-}
-
-// 룸 코드 포맷팅 (ABC-123)
-function formatRoomCode(input) {
-    let value = input.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
-    
-    if (value.length > 6) {
-        value = value.substring(0, 6);
-    }
-    
-    if (value.length > 3) {
-        value = value.substring(0, 3) + '-' + value.substring(3, 6);
-    }
-    
-    input.value = value;
 }
 
 // Google 로그인
@@ -585,6 +1013,11 @@ function openAdminPanel() {
 function closeAdminPanel() {
     adminPanel.style.display = 'none';
     roomSelection.style.display = 'block';
+    // 오늘 날짜 코드 다시 표시
+    const todayCodeElement = document.getElementById('todayRoomCode');
+    if (todayCodeElement) {
+        todayCodeElement.textContent = getTodayRoomCode();
+    }
 }
 
 // 모든 룸 목록 로드
@@ -673,7 +1106,7 @@ function createAdminRoomItemHTML(code, data) {
             </div>
             <div class="admin-room-info">
                 <div class="admin-room-info-item">📅 생성: ${createdTime}</div>
-                <div class="admin-room-info-item">📋 클립보드: ${clipboardCount}개</div>
+                <div class="admin-room-info-item">📋 기록노트: ${clipboardCount}개</div>
                 <div class="admin-room-info-item">⏰ 만료: ${expiresTime}</div>
             </div>
         </div>
@@ -826,7 +1259,9 @@ function setupEventListeners() {
     });
     
     // 룸 생성/입장
+    joinTodayRoomBtn.addEventListener('click', joinTodayRoom);
     createRoomBtn.addEventListener('click', createRoom);
+    joinDateRoomBtn.addEventListener('click', joinRoomByDate);
     joinRoomBtn.addEventListener('click', () => {
         const code = roomCodeInput.value.trim();
         if (code) {
@@ -836,15 +1271,17 @@ function setupEventListeners() {
         }
     });
     
-    // 룸 코드 입력 필드 포맷팅
-    roomCodeInput.addEventListener('input', (e) => {
-        formatRoomCode(e.target);
-    });
-    
     // 룸 코드 입력 필드 엔터키
     roomCodeInput.addEventListener('keypress', (e) => {
         if (e.key === 'Enter') {
             joinRoomBtn.click();
+        }
+    });
+    
+    // 날짜 입력 필드 변경 감지
+    datePickerInput.addEventListener('change', () => {
+        if (datePickerInput.value) {
+            joinDateRoomBtn.disabled = false;
         }
     });
     
@@ -863,6 +1300,9 @@ function setupEventListeners() {
     // 새 클립보드 추가
     addClipboardBtn.addEventListener('click', addClipboard);
     
+    // 말로 쓰기
+    voiceRecordBtn.addEventListener('click', toggleVoiceRecognition);
+    
     // 텍스트 영역 실시간 동기화
     newClipboardText.addEventListener('input', () => {
         updateCharCount();
@@ -880,9 +1320,33 @@ function setupEventListeners() {
 // 앱 초기화
 function initApp() {
     console.log(`${APP_NAME} v${APP_VERSION} 초기화 중...`);
+    
+    // 오늘 날짜 표시
+    const todayCodeElement = document.getElementById('todayRoomCode');
+    const todayCode = getTodayRoomCode();
+    console.log('오늘 방 코드:', todayCode);
+    
+    if (todayCodeElement) {
+        todayCodeElement.textContent = todayCode;
+        console.log('todayRoomCode 요소에 설정됨:', todayCode);
+    } else {
+        console.error('todayRoomCode 요소를 찾을 수 없습니다!');
+    }
+    
+    // 어제 날짜 placeholder 설정
+    const roomInput = document.getElementById('roomCodeInput');
+    if (roomInput) {
+        roomInput.placeholder = `예: ${getYesterdayRoomCode()}`;
+    }
+    
     setupEventListeners();
     console.log('앱이 준비되었습니다.');
 }
 
 // 앱 시작
-document.addEventListener('DOMContentLoaded', initApp);
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initApp);
+} else {
+    // DOM이 이미 로드된 경우 즉시 실행
+    initApp();
+}
