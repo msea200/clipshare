@@ -2,15 +2,14 @@
 // 본인의 Firebase 프로젝트 설정으로 변경하세요
 
 export const firebaseConfig = {
-    apiKey: "AIzaSyB4LQlDQcZfoQTbuvzxVHRrlOEnFqi1kmI",
-    authDomain: "mycopy-share.firebaseapp.com",
-    projectId: "mycopy-share",
-    storageBucket: "mycopy-share.firebasestorage.app",
-    messagingSenderId: "621363907111",
-    appId: "1:621363907111:web:d9df9b16bd1ed40e401c02",
-    databaseURL: "https://mycopy-share-default-rtdb.asia-southeast1.firebasedatabase.app/"
+    apiKey: "AIzaSyDhyfqV0IkxpQnjAvPaZHlLs4U1-KAqM7k",
+    authDomain: "clip2share.firebaseapp.com",
+    projectId: "clip2share",
+    storageBucket: "clip2share.firebasestorage.app",
+    messagingSenderId: "162423397060",
+    appId: "1:162423397060:web:10d6e7fc00367afb62c791",
+    databaseURL: "https://clip2share-default-rtdb.asia-southeast1.firebasedatabase.app/"
 };
-
 // App Configuration
 export const APP_NAME = "Clipboard Share";
 export const APP_VERSION = "1.0.0";
