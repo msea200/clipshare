@@ -59,27 +59,39 @@
             <div class="clipboard-content">
                 <div class="content-header">
                     <h3>공유된 클립보드</h3>
-                    <div class="char-count">
-                        <span id="charCount">0</span> / 10,000 자
+                    <div class="clipboard-count">
+                        <span id="clipboardCount">0</span>개의 클립보드
                     </div>
                 </div>
-                <textarea 
-                    id="clipboardText" 
-                    class="clipboard-textarea" 
-                    placeholder="여기에 텍스트를 입력하거나 붙여넣으세요...&#10;다른 PC에서도 동일한 룸 코드로 접속하면 실시간으로 공유됩니다."
-                    maxlength="10000"
-                ></textarea>
-                
-                <div class="action-buttons">
-                    <button id="copyTextBtn" class="btn btn-primary">
-                        <span>📋</span> 복사하기
-                    </button>
-                    <button id="clearTextBtn" class="btn btn-secondary">
-                        <span>🗑️</span> 지우기
-                    </button>
-                    <button id="pasteTextBtn" class="btn btn-secondary">
-                        <span>📄</span> 붙여넣기
-                    </button>
+
+                <!-- 새 클립보드 추가 영역 -->
+                <div class="new-clipboard">
+                    <textarea 
+                        id="newClipboardText" 
+                        class="clipboard-textarea" 
+                        placeholder="새 클립보드 내용을 입력하거나 붙여넣으세요..."
+                        maxlength="10000"
+                        rows="3"
+                    ></textarea>
+                    <div class="new-clipboard-actions">
+                        <div class="char-count">
+                            <span id="newCharCount">0</span> / 10,000 자
+                        </div>
+                        <button id="addClipboardBtn" class="btn btn-primary">
+                            <span>➕</span> 클립보드 추가
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 클립보드 목록 -->
+                <div class="clipboard-list">
+                    <div id="clipboardItems" class="clipboard-items">
+                        <!-- 클립보드 아이템들이 여기에 동적으로 추가됩니다 -->
+                        <div class="empty-state">
+                            <p>📋 아직 공유된 클립보드가 없습니다.</p>
+                            <p>위에서 새 클립보드를 추가해보세요!</p>
+                        </div>
+                    </div>
                 </div>
             </div>
 
