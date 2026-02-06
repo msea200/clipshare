@@ -1,0 +1,47 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    
+    "clipboard": {
+      "$roomCode": {
+        ".read": true,
+        ".write": true,
+        ".indexOn": ["expiresAt", "lastUpdated"],
+        ".validate": "newData.hasChildren(['code', 'text', 'createdAt', 'lastUpdated', 'expiresAt'])",
+        "code": {
+          ".validate": "newData.isString() && newData.val().length === 7"
+        },
+        "text": {
+          ".validate": "newData.isString() && newData.val().length <= 10000"
+        },
+        "createdAt": {
+          ".validate": "newData.isNumber()"
+        },
+        "lastUpdated": {
+          ".validate": "newData.isNumber()"
+        },
+        "expiresAt": {
+          ".validate": "newData.isNumber()"
+        }
+      }
+    },
+    
+    "files": {
+      ".read": "auth != null",
+      ".write": "auth != null",
+      ".indexOn": ["uploadedAt"]
+    },
+    "folders": {
+      ".read": "auth != null",
+      ".write": "auth != null",
+      ".indexOn": ["createdAt"]
+    },
+    "users": {
+      "$uid": {
+        ".read": "$uid === auth.uid || root.child('users/' + $uid + '/role').val() === 'admin'",
+        ".write": "$uid === auth.uid || root.child('users/' + auth.uid + '/role').val() === 'admin'"
+      }
+    }
+  }
+}

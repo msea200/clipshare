@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>클립보드 공유 - Clipboard Share</title>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>📋 클립보드 공유</h1>
+            <p class="subtitle">여러 PC 간 텍스트를 실시간으로 공유하세요</p>
+        </header>
+
+        <!-- 룸 선택 화면 -->
+        <div id="roomSelection" class="room-selection">
+            <div class="room-card">
+                <h2>새 룸 만들기</h2>
+                <button id="createRoomBtn" class="btn btn-primary">
+                    <span>🚀</span> 새 룸 생성
+                </button>
+            </div>
+
+            <div class="divider">
+                <span>또는</span>
+            </div>
+
+            <div class="room-card">
+                <h2>기존 룸 입장</h2>
+                <input 
+                    type="text" 
+                    id="roomCodeInput" 
+                    class="room-input" 
+                    placeholder="룸 코드 입력 (예: ABC-123)"
+                    maxlength="7"
+                >
+                <button id="joinRoomBtn" class="btn btn-secondary">
+                    <span>🔗</span> 룸 입장
+                </button>
+            </div>
+        </div>
+
+        <!-- 클립보드 공유 화면 -->
+        <div id="clipboardArea" class="clipboard-area" style="display: none;">
+            <div class="room-info">
+                <div class="room-code-display">
+                    <span class="label">룸 코드:</span>
+                    <span id="currentRoomCode" class="room-code"></span>
+                    <button id="copyRoomCodeBtn" class="btn-icon" title="룸 코드 복사">📋</button>
+                </div>
+                <div class="connection-status">
+                    <span id="connectionStatus" class="status-indicator">⚫</span>
+                    <span id="connectionText">연결 중...</span>
+                </div>
+                <button id="leaveRoomBtn" class="btn btn-leave">나가기</button>
+            </div>
+
+            <div class="clipboard-content">
+                <div class="content-header">
+                    <h3>공유된 클립보드</h3>
+                    <div class="char-count">
+                        <span id="charCount">0</span> / 10,000 자
+                    </div>
+                </div>
+                <textarea 
+                    id="clipboardText" 
+                    class="clipboard-textarea" 
+                    placeholder="여기에 텍스트를 입력하거나 붙여넣으세요...&#10;다른 PC에서도 동일한 룸 코드로 접속하면 실시간으로 공유됩니다."
+                    maxlength="10000"
+                ></textarea>
+                
+                <div class="action-buttons">
+                    <button id="copyTextBtn" class="btn btn-primary">
+                        <span>📋</span> 복사하기
+                    </button>
+                    <button id="clearTextBtn" class="btn btn-secondary">
+                        <span>🗑️</span> 지우기
+                    </button>
+                    <button id="pasteTextBtn" class="btn btn-secondary">
+                        <span>📄</span> 붙여넣기
+                    </button>
+                </div>
+            </div>
+
+            <div class="info-section">
+                <h4>💡 사용 팁</h4>
+                <ul>
+                    <li>룸 코드를 다른 PC에 공유하여 같은 룸에 입장하세요</li>
+                    <li>텍스트가 자동으로 저장되며 실시간으로 동기화됩니다</li>
+                    <li>룸은 24시간 후 자동으로 삭제됩니다</li>
+                    <li>민감한 정보는 공유하지 마세요</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- 알림 메시지 -->
+        <div id="notification" class="notification"></div>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+    
+    <!-- App Scripts -->
+    <script type="module" src="js/app.js"></script>
+</body>
+</html>
