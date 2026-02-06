@@ -6,6 +6,15 @@
         ".read": true,
         ".write": "auth != null && (auth.token.email == 'msea200@gmail.com' || auth.token.email == 'bkcode200@gmail.com' || !data.exists())",
         ".indexOn": ["expiresAt", "lastUpdated", "permanent"],
+        "clipboards": {
+          ".write": true
+        },
+        "tempText": {
+          ".write": true
+        },
+        "lastUpdated": {
+          ".write": true
+        },
         "permanent": {
           ".write": "auth != null && (auth.token.email == 'msea200@gmail.com' || auth.token.email == 'bkcode200@gmail.com')"
         }

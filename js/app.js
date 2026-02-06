@@ -129,18 +129,24 @@ function formatTime(timestamp) {
 function createClipboardItemHTML(id, data) {
     const time = formatTime(data.createdAt);
     const length = data.text.length;
+    const authorName = data.author?.name || '익명';
+    const authorPhoto = data.author?.photo;
     
     return `
         <div class="clipboard-item" data-id="${id}">
             <div class="clipboard-item-header">
-                <div class="clipboard-item-info">
-                    <span class="clipboard-item-time">🕐 ${time}</span>
-                    <span class="clipboard-item-length">📝 ${length.toLocaleString()}자</span>
+                <div class="clipboard-item-author">
+                    ${authorPhoto ? `<img src="${authorPhoto}" class="clipboard-author-photo" alt="${authorName}">` : '<span class="clipboard-author-icon">👤</span>'}
+                    <span class="clipboard-author-name">${escapeHtml(authorName)}</span>
                 </div>
                 <div class="clipboard-item-actions">
                     <button class="btn-icon-sm copy-item" title="복사">📋</button>
                     <button class="btn-icon-sm danger delete-item" title="삭제">🗑️</button>
                 </div>
+            </div>
+            <div class="clipboard-item-meta">
+                <span class="clipboard-item-time">🕐 ${time}</span>
+                <span class="clipboard-item-length">📝 ${length.toLocaleString()}자</span>
             </div>
             <div class="clipboard-item-content">${escapeHtml(data.text)}</div>
         </div>
@@ -375,9 +381,20 @@ async function addClipboard() {
     
     try {
         const newClipboardRef = clipboardsRef.push();
+        
+        // 작성자 정보 추가
+        const authorName = currentUser ? (currentUser.displayName || currentUser.email) : '익명';
+        const authorEmail = currentUser ? currentUser.email : null;
+        const authorPhoto = currentUser ? currentUser.photoURL : null;
+        
         await newClipboardRef.set({
             text: text,
-            createdAt: firebase.database.ServerValue.TIMESTAMP
+            createdAt: firebase.database.ServerValue.TIMESTAMP,
+            author: {
+                name: authorName,
+                email: authorEmail,
+                photo: authorPhoto
+            }
         });
         
         // 입력 필드 및 임시 텍스트 초기화
