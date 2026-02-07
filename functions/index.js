@@ -1,18 +1,17 @@
 /**
- * Firebase Cloud Functions for Easy Note
+ * Firebase Cloud Functions for Time Note
  * OpenAI API를 안전하게 호출하는 백엔드 함수
  */
 
-// 로컬 개발 환경에서 .env 파일 로드
-if (process.env.NODE_ENV !== 'production') {
-  require('dotenv').config();
-}
-
 const {onRequest} = require("firebase-functions/v2/https");
+const {defineSecret} = require("firebase-functions/params");
 const admin = require('firebase-admin');
 const logger = require("firebase-functions/logger");
 
 admin.initializeApp();
+
+// Firebase Secret Manager에서 API 키 정의
+const openaiApiKey = defineSecret("OPENAI_API_KEY");
 
 /**
  * OpenAI API를 사용하여 일정을 정리하는 함수
@@ -22,7 +21,8 @@ exports.organizeSchedule = onRequest(
   {
     region: 'asia-northeast3', // 서울 리전
     cors: true, // CORS 자동 처리
-    maxInstances: 10
+    maxInstances: 10,
+    secrets: [openaiApiKey] // Secret 사용 선언
   },
   async (req, res) => {
     // POST 요청만 허용
@@ -31,19 +31,6 @@ exports.organizeSchedule = onRequest(
     }
 
     try {
-      // 인증 확인 (선택사항: Firebase Auth 토큰 검증)
-      const authHeader = req.headers.authorization;
-      if (authHeader && authHeader.startsWith('Bearer ')) {
-        const idToken = authHeader.split('Bearer ')[1];
-        try {
-          await admin.auth().verifyIdToken(idToken);
-          logger.info('사용자 인증 성공');
-        } catch (error) {
-          logger.error('인증 실패:', error);
-          return res.status(401).json({ error: 'Unauthorized' });
-        }
-      }
-
       // 요청 데이터 가져오기
       const { prompt } = req.body;
 
@@ -51,9 +38,9 @@ exports.organizeSchedule = onRequest(
         return res.status(400).json({ error: '메모를 입력하세요.' });
       }
 
-      // 환경 변수에서 OpenAI API 키 가져오기
-      const openaiApiKey = process.env.OPENAI_API_KEY;
-      if (!openaiApiKey) {
+      // Secret에서 OpenAI API 키 가져오기
+      const apiKey = openaiApiKey.value();
+      if (!apiKey) {
         logger.error('OpenAI API 키가 설정되지 않았습니다.');
         return res.status(500).json({ error: '서버 설정 오류' });
       }
@@ -65,7 +52,7 @@ exports.organizeSchedule = onRequest(
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${openaiApiKey}`
+          'Authorization': `Bearer ${apiKey}`
         },
         body: JSON.stringify({
           model: 'gpt-4o-mini',

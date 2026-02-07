@@ -1,5 +1,0 @@
-# 로컬 개발용 환경 변수 예제
-# 이 파일을 .dev.vars로 복사하고 실제 API 키를 입력하세요
-# .dev.vars는 .gitignore에 포함되어 있습니다
-
-OPENAI_API_KEY=sk-your-openai-api-key-here

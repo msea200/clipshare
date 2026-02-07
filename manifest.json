@@ -1,6 +1,6 @@
 {
-  "name": "Easy Note - 간편한 노트 공유",
-  "short_name": "Easy Note",
+  "name": "Time Note - 일정과 노트 공유",
+  "short_name": "Time Note",
   "description": "여러 기기에서 노트를 실시간으로 공유하세요",
   "start_url": "/",
   "display": "standalone",

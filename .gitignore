@@ -1,7 +1,3 @@
-# API Keys (보안)
-js/api-key.js
-worker/.env
-
 # Logs
 logs
 *.log

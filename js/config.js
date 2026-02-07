@@ -1,19 +1,19 @@
 // Firebase Configuration for Clipboard Share
-// 본인의 Firebase 프로젝트 설정으로 변경하세요
+// time2share 프로젝트 (Blaze 요금제)
 
 export const firebaseConfig = {
-    apiKey: "AIzaSyDhyfqV0IkxpQnjAvPaZHlLs4U1-KAqM7k",
-    authDomain: "clip2share.firebaseapp.com",
-    projectId: "clip2share",
-    storageBucket: "clip2share.firebasestorage.app",
-    messagingSenderId: "162423397060",
-    appId: "1:162423397060:web:10d6e7fc00367afb62c791",
-    databaseURL: "https://clip2share-default-rtdb.asia-southeast1.firebasedatabase.app/"
+    apiKey: "AIzaSyCEK2TKbac8alN5-q60FHbuRzYaer4MJiI",
+    authDomain: "time2share.firebaseapp.com",
+    projectId: "time2share",
+    storageBucket: "time2share.firebasestorage.app",
+    messagingSenderId: "431189624696",
+    appId: "1:431189624696:web:c6f2a1dcc062e20c0dea8d",
+    databaseURL: "https://time2share-default-rtdb.asia-southeast1.firebasedatabase.app/"
 };
 // App Configuration
-export const APP_NAME = "Easy Note";
-export const APP_VERSION = "1.0.4";
-export const APP_BUILD = "2026-02-07-voice-simple";
+export const APP_NAME = "Time Note";
+export const APP_VERSION = "1.0.5";
+export const APP_BUILD = "2026-02-07-timenote";
 
 // RTDB Path
 export const RTDB_PATH = {

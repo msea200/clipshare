@@ -210,7 +210,7 @@ function updateCharCount() {
     newCharCount.textContent = count.toLocaleString();
 }
 
-// GPT 프롬프트 전송 (OpenAI API 직접 호출)
+// GPT 프롬프트 전송 (Firebase Functions 백엔드 사용)
 async function sendGptPrompt() {
     const prompt = gptPromptInput.value.trim();
     
@@ -225,54 +225,25 @@ async function sendGptPrompt() {
     gptResultArea.style.display = 'none';
     
     try {
-        // OpenAI API 키 (환경 변수 또는 직접 설정)
-        const OPENAI_API_KEY = window.OPENAI_API_KEY || 'YOUR_API_KEY_HERE';
+        // Firebase Functions URL
+        const FUNCTIONS_URL = 'https://asia-northeast3-time2share.cloudfunctions.net/organizeSchedule';
         
-        const SYSTEM_PROMPT = `당신은 일정과 메모를 정리하고 정보를 탐색하고 정리해주는 전문가 입니다.
-
-사용자가 입력한 메모를 다음 규칙에 따라 정리하세요:
-
-1. **날짜와 시간**: 모든 날짜와 시간을 명확하게 표시하세요 (예: 2024-01-15 14:00)
-2. **카테고리 분류**: 업무, 개인, 중요, 긴급 등으로 구분하세요
-3. **우선순위**: 중요도에 따라 ⭐ 표시를 추가하세요
-4. **체크리스트**: 할 일 목록은 - [ ] 형식으로 변환하세요
-5. **간결성**: 불필요한 내용은 제거하고 핵심만 남기세요
-6. **구조화**: 제목, 소제목, 목록을 활용해 읽기 쉽게 정리하세요
-7. **정보탐색** : 사용자가 "검색해", "알려줘", "추천해" 등의 요청 시 관련 정보를 검색하여 함께 제공하세요.
-
-입력된 메모를 분석하고 위 규칙에 따라 깔끔하게 정리해주세요.`;
-        
-        // OpenAI API 직접 호출
-        const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        // Firebase Functions 호출
+        const response = await fetch(FUNCTIONS_URL, {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${OPENAI_API_KEY}`
+                'Content-Type': 'application/json'
             },
-            body: JSON.stringify({
-                model: 'gpt-4o-mini',
-                messages: [
-                    {
-                        role: 'system',
-                        content: SYSTEM_PROMPT
-                    },
-                    {
-                        role: 'user',
-                        content: prompt
-                    }
-                ],
-                max_tokens: 1500,
-                temperature: 0.7
-            })
+            body: JSON.stringify({ prompt })
         });
         
         if (!response.ok) {
             const errorData = await response.json();
-            throw new Error(errorData.error?.message || `API 요청 실패 (${response.status})`);
+            throw new Error(errorData.error || `API 요청 실패 (${response.status})`);
         }
         
         const data = await response.json();
-        const result = data.choices[0].message.content;
+        const result = data.result;
         
         // 결과 표시
         currentGptResult = result;

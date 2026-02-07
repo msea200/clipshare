@@ -1,4 +1,4 @@
-const CACHE_NAME = 'easy-note-v1.0.4';
+const CACHE_NAME = 'time-note-v1.0.5';
 const urlsToCache = [
   '/',
   '/index.html',
@@ -119,7 +119,7 @@ self.addEventListener('push', (event) => {
   };
   
   event.waitUntil(
-    self.registration.showNotification('Easy Note', options)
+    self.registration.showNotification('Time Note', options)
   );
 });
 
