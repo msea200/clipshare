@@ -94,6 +94,12 @@ const voiceRecordBtn = document.getElementById('voiceRecordBtn');
 const installPrompt = document.getElementById('installPrompt');
 const installBtn = document.getElementById('installBtn');
 const dismissInstallBtn = document.getElementById('dismissInstallBtn');
+const gptPromptInput = document.getElementById('gptPromptInput');
+const sendGptBtn = document.getElementById('sendGptBtn');
+const gptVoiceBtn = document.getElementById('gptVoiceBtn');
+const gptResultArea = document.getElementById('gptResultArea');
+const gptResultContent = document.getElementById('gptResultContent');
+const saveGptResultBtn = document.getElementById('saveGptResultBtn');
 
 // 상태 관리
 let currentRoom = null;
@@ -103,12 +109,20 @@ let tempTextRef = null;
 let isUpdatingFromFirebase = false;
 let isUpdatingTempText = false;
 let tempTextTimeout = null;
+let currentGptResult = '';
 let currentUser = null;
 let isFromAdminPanel = false; // 관리자 패널에서 입장했는지 여부
 let adminRoomFilter = 'normal'; // 'normal' or 'permanent'
 let recognition = null; // 음성 인식 객체
+let gptRecognition = null; // GPT용 음성 인식 객체
 let isRecording = false; // 음성 녹음 중인지
+let isGptRecording = false; // GPT 음성 녹음 중인지
 let silenceTimer = null; // 무음 타이머
+let gptSilenceTimer = null; // GPT 무음 타이머
+let gptLastProcessedIndex = 0; // GPT 음성 인식에서 마지막으로 처리한 결과 인덱스
+let voiceLastProcessedIndex = 0; // 일반 음성 인식에서 마지막으로 처리한 결과 인덱스
+let gptLastAddedText = ''; // GPT 음성 인식에서 마지막으로 추가한 텍스트 (중복 방지)
+let voiceLastAddedText = ''; // 일반 음성 인식에서 마지막으로 추가한 텍스트 (중복 방지)
 
 // 룸 코드 생성 (YYMMDD-001 형식)
 async function generateRoomCode() {
@@ -196,6 +210,130 @@ function updateCharCount() {
     newCharCount.textContent = count.toLocaleString();
 }
 
+// GPT 프롬프트 전송 (OpenAI API 직접 호출)
+async function sendGptPrompt() {
+    const prompt = gptPromptInput.value.trim();
+    
+    if (!prompt) {
+        showNotification('메모를 입력하세요.', 'warning');
+        return;
+    }
+    
+    // 버튼 비활성화 및 로딩 상태
+    sendGptBtn.disabled = true;
+    sendGptBtn.innerHTML = '<span>⏳</span> 처리 중...';
+    gptResultArea.style.display = 'none';
+    
+    try {
+        // OpenAI API 키 (환경 변수 또는 직접 설정)
+        const OPENAI_API_KEY = window.OPENAI_API_KEY || 'YOUR_API_KEY_HERE';
+        
+        const SYSTEM_PROMPT = `당신은 일정과 메모를 정리하고 정보를 탐색하고 정리해주는 전문가 입니다.
+
+사용자가 입력한 메모를 다음 규칙에 따라 정리하세요:
+
+1. **날짜와 시간**: 모든 날짜와 시간을 명확하게 표시하세요 (예: 2024-01-15 14:00)
+2. **카테고리 분류**: 업무, 개인, 중요, 긴급 등으로 구분하세요
+3. **우선순위**: 중요도에 따라 ⭐ 표시를 추가하세요
+4. **체크리스트**: 할 일 목록은 - [ ] 형식으로 변환하세요
+5. **간결성**: 불필요한 내용은 제거하고 핵심만 남기세요
+6. **구조화**: 제목, 소제목, 목록을 활용해 읽기 쉽게 정리하세요
+7. **정보탐색** : 사용자가 "검색해", "알려줘", "추천해" 등의 요청 시 관련 정보를 검색하여 함께 제공하세요.
+
+입력된 메모를 분석하고 위 규칙에 따라 깔끔하게 정리해주세요.`;
+        
+        // OpenAI API 직접 호출
+        const response = await fetch('https://api.openai.com/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${OPENAI_API_KEY}`
+            },
+            body: JSON.stringify({
+                model: 'gpt-4o-mini',
+                messages: [
+                    {
+                        role: 'system',
+                        content: SYSTEM_PROMPT
+                    },
+                    {
+                        role: 'user',
+                        content: prompt
+                    }
+                ],
+                max_tokens: 1500,
+                temperature: 0.7
+            })
+        });
+        
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error?.message || `API 요청 실패 (${response.status})`);
+        }
+        
+        const data = await response.json();
+        const result = data.choices[0].message.content;
+        
+        // 결과 표시
+        currentGptResult = result;
+        gptResultContent.innerHTML = result.replace(/\n/g, '<br>');
+        gptResultArea.style.display = 'block';
+        
+        showNotification('AI 정리 완료!', 'success');
+        
+    } catch (error) {
+        console.error('AI 처리 오류:', error);
+        showNotification(`오류: ${error.message}`, 'error');
+    } finally {
+        // 버튼 복원
+        sendGptBtn.disabled = false;
+        sendGptBtn.innerHTML = '<span>✨</span> AI로 정리하기';
+    }
+}
+
+// GPT 결과를 노트로 저장
+async function saveGptResultAsNote() {
+    if (!currentGptResult) {
+        showNotification('저장할 내용이 없습니다.', 'warning');
+        return;
+    }
+    
+    if (!currentRoom) {
+        showNotification('먼저 방에 입장하세요.', 'warning');
+        return;
+    }
+    
+    try {
+        const newClipboardRef = clipboardsRef.push();
+        
+        // 작성자 정보 추가
+        const authorName = currentUser ? (currentUser.displayName || currentUser.email) : '익명';
+        const authorEmail = currentUser ? currentUser.email : null;
+        const authorPhoto = currentUser ? currentUser.photoURL : null;
+        
+        await newClipboardRef.set({
+            text: currentGptResult,
+            createdAt: firebase.database.ServerValue.TIMESTAMP,
+            author: {
+                name: authorName,
+                email: authorEmail,
+                photo: authorPhoto
+            }
+        });
+        
+        // 입력창 초기화
+        gptPromptInput.value = '';
+        currentGptResult = '';
+        gptResultArea.style.display = 'none';
+        
+        showNotification('노트로 저장되었습니다!', 'success');
+        
+    } catch (error) {
+        console.error('저장 실패:', error);
+        showNotification('저장에 실패했습니다.', 'error');
+    }
+}
+
 // 음성 인식 초기화
 function initVoiceRecognition() {
     // 브라우저 정보 로그
@@ -222,6 +360,8 @@ function initVoiceRecognition() {
         
         recognitionInstance.onstart = () => {
             console.log('✅ onstart 이벤트 발생 - 음성 인식 시작됨');
+            voiceLastProcessedIndex = 0; // 인덱스 초기화
+            voiceLastAddedText = ''; // 마지막 추가 텍스트 초기화
             isRecording = true;
             if (voiceRecordBtn) {
                 voiceRecordBtn.innerHTML = '<span>⏹️</span> 기록 종료';
@@ -235,36 +375,42 @@ function initVoiceRecognition() {
         };
         
         recognitionInstance.onresult = (event) => {
-            console.log('음성 인식 결과:', event.results);
+            console.log('음성 인식 결과 - 전체 개수:', event.results.length, '마지막 처리 인덱스:', voiceLastProcessedIndex);
             resetSilenceTimer();
-            let finalTranscript = '';
-            let interimTranscript = '';
             
-            for (let i = event.resultIndex; i < event.results.length; i++) {
-                const transcript = event.results[i][0].transcript;
-                if (event.results[i].isFinal) {
-                    finalTranscript += transcript;
-                } else {
-                    interimTranscript += transcript;
-                }
-            }
-            
-            if (finalTranscript) {
-                const currentText = newClipboardText.value;
-                newClipboardText.value = currentText + (currentText ? ' ' : '') + finalTranscript;
-                updateCharCount();
+            // 아직 처리하지 않은 결과만 처리
+            for (let i = voiceLastProcessedIndex; i < event.results.length; i++) {
+                const result = event.results[i];
+                const transcript = result[0].transcript.trim();
                 
-                // continuous가 false일 때 자동으로 재시작
-                if (isRecording) {
-                    setTimeout(() => {
-                        if (isRecording) {
-                            try {
-                                recognitionInstance.start();
-                            } catch (e) {
-                                console.log('재시작 오류 무시:', e);
+                console.log(`  결과[${i}]:`, transcript, 'isFinal:', result.isFinal);
+                
+                // 최종 결과이고, 이전에 추가한 텍스트와 다를 때만 추가
+                if (result.isFinal && transcript && transcript !== voiceLastAddedText) {
+                    const currentText = newClipboardText.value;
+                    newClipboardText.value = currentText + (currentText && !currentText.endsWith(' ') ? ' ' : '') + transcript;
+                    updateCharCount();
+                    voiceLastProcessedIndex = i + 1; // 다음 인덱스로 업데이트
+                    voiceLastAddedText = transcript; // 추가한 텍스트 저장
+                    console.log('  -> 텍스트 추가됨:', transcript, '다음 처리 인덱스:', voiceLastProcessedIndex);
+                    
+                    // continuous가 false일 때 자동으로 재시작
+                    if (isRecording) {
+                        voiceLastProcessedIndex = 0; // 재시작 시 인덱스 리셋
+                        voiceLastAddedText = ''; // 재시작 시 마지막 텍스트도 리셋
+                        setTimeout(() => {
+                            if (isRecording) {
+                                try {
+                                    recognitionInstance.start();
+                                } catch (e) {
+                                    console.log('재시작 오류 무시:', e);
+                                }
                             }
-                        }
-                    }, 300);
+                        }, 300);
+                    }
+                } else if (result.isFinal && transcript === voiceLastAddedText) {
+                    console.log('  -> 중복 텍스트 무시:', transcript);
+                    voiceLastProcessedIndex = i + 1; // 인덱스는 증가
                 }
             }
         };
@@ -435,6 +581,214 @@ function clearSilenceTimer() {
         clearTimeout(silenceTimer);
         silenceTimer = null;
     }
+}
+
+// GPT 음성 인식 토글
+async function toggleGptVoiceRecognition() {
+    console.log('toggleGptVoiceRecognition 호출됨, isGptRecording:', isGptRecording);
+    
+    if (isGptRecording) {
+        stopGptVoiceRecognition();
+        return;
+    }
+    
+    // 버튼 상태를 먼저 변경
+    if (gptVoiceBtn) {
+        gptVoiceBtn.innerHTML = '<span>⏳</span> 준비 중...';
+        gptVoiceBtn.disabled = true;
+    }
+    
+    // 마이크 권한 확인
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        stream.getTracks().forEach(track => track.stop());
+    } catch (error) {
+        console.error('마이크 권한 오류:', error);
+        showNotification('마이크 권한이 필요합니다.', 'error');
+        if (gptVoiceBtn) {
+            gptVoiceBtn.innerHTML = '<span>🎤</span> 말로 쓰기';
+            gptVoiceBtn.disabled = false;
+        }
+        return;
+    }
+    
+    if (!gptRecognition) {
+        gptRecognition = initGptVoiceRecognition();
+        if (!gptRecognition) {
+            showNotification('음성 인식을 지원하지 않는 브라우저입니다.', 'error');
+            if (gptVoiceBtn) {
+                gptVoiceBtn.innerHTML = '<span>🎤</span> 말로 쓰기';
+                gptVoiceBtn.disabled = false;
+            }
+            return;
+        }
+    }
+    
+    try {
+        isGptRecording = true;
+        if (gptVoiceBtn) {
+            gptVoiceBtn.innerHTML = '<span>⏹️</span> 기록 종료';
+            gptVoiceBtn.style.background = '#e74c3c';
+            gptVoiceBtn.disabled = false;
+        }
+        showNotification('말씀하세요...', 'info');
+        
+        gptRecognition.start();
+        resetGptSilenceTimer();
+        
+    } catch (error) {
+        console.error('음성 인식 시작 실패:', error);
+        isGptRecording = false;
+        
+        if (gptVoiceBtn) {
+            gptVoiceBtn.innerHTML = '<span>🎤</span> 말로 쓰기';
+            gptVoiceBtn.style.background = '';
+            gptVoiceBtn.disabled = false;
+        }
+        
+        if (error.name === 'InvalidStateError') {
+            gptRecognition = null;
+            setTimeout(() => toggleGptVoiceRecognition(), 500);
+        } else {
+            showNotification(`음성 인식 시작 실패: ${error.message}`, 'error');
+        }
+    }
+}
+
+// GPT 음성 인식 종료
+function stopGptVoiceRecognition() {
+    if (gptRecognition && isGptRecording) {
+        gptRecognition.stop();
+        isGptRecording = false;
+        gptVoiceBtn.innerHTML = '<span>🎤</span> 말로 쓰기';
+        gptVoiceBtn.style.background = '';
+        clearGptSilenceTimer();
+        showNotification('음성 기록이 종료되었습니다.', 'info');
+    }
+}
+
+// GPT 무음 타이머 리셋
+function resetGptSilenceTimer() {
+    clearGptSilenceTimer();
+    gptSilenceTimer = setTimeout(() => {
+        if (isGptRecording) {
+            showNotification('30초간 음성이 감지되지 않아 자동 종료합니다.', 'info');
+            stopGptVoiceRecognition();
+        }
+    }, 30000);
+}
+
+// GPT 무음 타이머 클리어
+function clearGptSilenceTimer() {
+    if (gptSilenceTimer) {
+        clearTimeout(gptSilenceTimer);
+        gptSilenceTimer = null;
+    }
+}
+
+// GPT용 음성 인식 초기화
+function initGptVoiceRecognition() {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    
+    if (!SpeechRecognition) {
+        return null;
+    }
+    
+    const recognition = new SpeechRecognition();
+    
+    // 모바일 감지
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    
+    // 모바일에서 마지막으로 받은 전체 텍스트 (누적 결과 처리용)
+    let lastFullTranscript = '';
+    
+    if (isMobile) {
+        // 모바일: 각 발화 단위로 구분
+        recognition.continuous = false;
+        recognition.interimResults = false;
+        console.log('GPT 음성 인식: 모바일 모드');
+    } else {
+        // PC: 연속 인식 (기존 방식 유지)
+        recognition.continuous = true;
+        recognition.interimResults = true;
+        console.log('GPT 음성 인식: PC 모드');
+    }
+    recognition.lang = 'ko-KR';
+    
+    recognition.onstart = () => {
+        console.log('GPT 음성 인식 시작');
+        lastFullTranscript = ''; // 시작 시 초기화
+    };
+    
+    recognition.onresult = (event) => {
+        const result = event.results[event.results.length - 1];
+        
+        if (result.isFinal) {
+            const transcript = result[0].transcript.trim();
+            console.log('GPT 음성 인식 결과:', transcript);
+            console.log('이전 전체 텍스트:', lastFullTranscript);
+            
+            if (transcript) {
+                let textToAdd = transcript;
+                
+                // 모바일: 새 결과가 이전 결과를 포함하면, 새로 추가된 부분만 추출
+                if (isMobile && lastFullTranscript && transcript.startsWith(lastFullTranscript)) {
+                    textToAdd = transcript.substring(lastFullTranscript.length).trim();
+                    console.log('추출된 새 부분:', textToAdd);
+                }
+                
+                if (textToAdd) {
+                    const currentText = gptPromptInput.value;
+                    gptPromptInput.value = currentText + (currentText && !currentText.endsWith(' ') ? ' ' : '') + textToAdd;
+                    resetGptSilenceTimer();
+                }
+                
+                // 모바일: 현재 전체 텍스트 저장
+                if (isMobile) {
+                    lastFullTranscript = transcript;
+                }
+            }
+        }
+    };
+    
+    recognition.onerror = (event) => {
+        console.error('GPT 음성 인식 오류:', event.error);
+        
+        if (event.error === 'no-speech') {
+            // 음성이 없으면 자동 재시작
+            if (isGptRecording) {
+                try {
+                    recognition.start();
+                } catch (e) {
+                    console.log('재시작 시도:', e);
+                }
+            }
+        } else if (event.error === 'not-allowed') {
+            showNotification('마이크 권한이 거부되었습니다.', 'error');
+            stopGptVoiceRecognition();
+        } else if (event.error !== 'aborted') {
+            showNotification(`음성 인식 오류: ${event.error}`, 'error');
+            stopGptVoiceRecognition();
+        }
+    };
+    
+    recognition.onend = () => {
+        console.log('GPT 음성 인식 세션 종료, 재시작 여부:', isGptRecording);
+        if (isGptRecording) {
+            // 짧은 지연 후 재시작 (모바일 안정성)
+            setTimeout(() => {
+                if (isGptRecording) {
+                    try {
+                        recognition.start();
+                    } catch (error) {
+                        console.error('재시작 실패:', error);
+                    }
+                }
+            }, 100);
+        }
+    };
+    
+    return recognition;
 }
 
 // 클립보드 개수 업데이트
@@ -1360,6 +1714,27 @@ function setupEventListeners() {
     newClipboardText.addEventListener('keydown', (e) => {
         if (e.ctrlKey && e.key === 'Enter') {
             addClipboard();
+        }
+    });
+    
+    // GPT 프롬프트 전송
+    sendGptBtn.addEventListener('click', sendGptPrompt);
+    
+    // GPT 음성 입력
+    if (gptVoiceBtn) {
+        gptVoiceBtn.addEventListener('click', toggleGptVoiceRecognition);
+        console.log('GPT 음성 버튼 이벤트 리스너 등록됨');
+    } else {
+        console.error('gptVoiceBtn을 찾을 수 없습니다!');
+    }
+    
+    // GPT 결과 저장
+    saveGptResultBtn.addEventListener('click', saveGptResultAsNote);
+    
+    // GPT 입력 필드 엔터키 (Ctrl+Enter로 전송)
+    gptPromptInput.addEventListener('keydown', (e) => {
+        if (e.ctrlKey && e.key === 'Enter') {
+            sendGptPrompt();
         }
     });
 }

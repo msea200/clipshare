@@ -161,6 +161,39 @@
             </div>
 
             <div class="clipboard-content">
+                <!-- AI 일정 정리 섹션 -->
+                <div class="gpt-section" style="margin-bottom: 2rem;">
+                    <h4>🤖 AI 일정 정리</h4>
+                    <p class="gpt-description">메모를 입력하면 AI가 정리된 일정으로 변환해드립니다</p>
+                    
+                    <div class="gpt-input-area">
+                        <textarea 
+                            id="gptPromptInput" 
+                            class="gpt-textarea" 
+                            placeholder="예: 내일 오후 3시 회의, 금요일 저녁 7시 저녁 약속"
+                            rows="4"
+                        ></textarea>
+                        <div style="display: flex; gap: 0.5rem;">
+                            <button id="gptVoiceBtn" class="btn btn-secondary" style="flex: 1;">
+                                <span>🎤</span> 말로 쓰기
+                            </button>
+                            <button id="sendGptBtn" class="btn btn-primary" style="flex: 1;">
+                                <span>✨</span> AI로 정리하기
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div id="gptResultArea" class="gpt-result-area" style="display: none;">
+                        <div class="gpt-result-header">
+                            <h5>정리된 결과</h5>
+                            <button id="saveGptResultBtn" class="btn btn-secondary btn-sm">
+                                <span>💾</span> 노트로 저장
+                            </button>
+                        </div>
+                        <div id="gptResultContent" class="gpt-result-content"></div>
+                    </div>
+                </div>
+
                 <div class="content-header">
                     <h3>기록완료 노트</h3>
                     <div class="clipboard-count">
@@ -205,16 +238,6 @@
                     </div>
                 </div>
             </div>
-
-            <div class="info-section">
-                <h4>💡 사용 팁</h4>
-                <ul>
-                    <li>방 코드를 다른 기기에 공유하여 같은 방에 입장하세요</li>
-                    <li>노트가 자동으로 저장되며 실시간으로 동기화됩니다</li>
-                    <li>방은 24시간 후 자동으로 삭제됩니다</li>
-                    <li>민감한 정보는 공유하지 마세요</li>
-                </ul>
-            </div>
         </div>
 
         <!-- 알림 메시지 -->
@@ -238,6 +261,9 @@
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+    
+    <!-- API Key (Git에서 제외됨) -->
+    <script src="js/api-key.js"></script>
     
     <!-- App Scripts -->
     <script type="module" src="js/app.js"></script>

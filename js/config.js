@@ -12,8 +12,8 @@ export const firebaseConfig = {
 };
 // App Configuration
 export const APP_NAME = "Easy Note";
-export const APP_VERSION = "1.0.0";
-export const APP_BUILD = "2026-02-07";
+export const APP_VERSION = "1.0.4";
+export const APP_BUILD = "2026-02-07-voice-simple";
 
 // RTDB Path
 export const RTDB_PATH = {
@@ -25,3 +25,7 @@ export const ROOM_EXPIRY_HOURS = 24;
 export const MAX_TEXT_LENGTH = 10000;
 export const UPDATE_DEBOUNCE_MS = 500;
 export const CLEANUP_INTERVAL_MS = 10 * 60 * 1000; // 10분
+
+// OpenAI Configuration
+// ✅ 보안: API 키는 Firebase Functions에서 환경 변수로 관리됩니다.
+// 클라이언트에서는 Firebase Function을 통해 안전하게 호출합니다.

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'easy-note-v1.0.1';
+const CACHE_NAME = 'easy-note-v1.0.4';
 const urlsToCache = [
   '/',
   '/index.html',

@@ -19,6 +19,8 @@
 - ⏰ **자동 정리**: 24시간 후 방 자동 삭제 (영구 보관 제외)
 - 📱 **반응형 디자인**: 모바일과 데스크톱 모두 지원
 - ⌨️ **단축키 지원**: Ctrl+Enter로 빠르게 노트 추가
+- 🎤 **음성 입력**: Web Speech API로 말로 쓰기
+- ✨ **AI 정리**: OpenAI GPT-4o-mini로 메모 자동 정리 (Cloudflare Workers)
 
 ## 🚀 빠른 시작
 
@@ -132,35 +134,26 @@ export const UPDATE_DEBOUNCE_MS = 500;      // 업데이트 지연 시간 (밀�
 export const CLEANUP_INTERVAL_MS = 600000;  // 정리 주기 (밀리초)
 ```
 
-## 🌐 Firebase 호스팅 배포 (선택사항)
+## 🌐 배포
 
-### 1. Firebase CLI 설치
+### 1. Cloudflare Workers 배포 (AI 기능)
 
 ```bash
-npm install -g firebase-tools
+cd worker
+wrangler login
+wrangler secret put OPENAI_API_KEY
+wrangler deploy
 ```
 
-### 2. Firebase 로그인
+배포 후 나온 Worker URL을 [js/app.js](js/app.js)에서 업데이트하세요.
+
+자세한 내용은 [worker/README.md](worker/README.md)를 참고하세요.
+
+### 2. Firebase Hosting 배포
 
 ```bash
 firebase login
-```
-
-### 3. Firebase 프로젝트 초기화
-
-```bash
-firebase init
-```
-
-- Hosting 선택
-- 기존 프로젝트 선택
-- Public directory: `.` (현재 디렉토리)
-- Single-page app: `No`
-
-### 4. 배포
-
-```bash
-firebase deploy
+firebase deploy --only hosting
 ```
 
 배포 후 제공되는 URL을 통해 어디서든 접속 가능합니다.
